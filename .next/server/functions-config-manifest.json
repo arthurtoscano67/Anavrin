@@ -1,7 +1,0 @@
-{
-  "version": 1,
-  "functions": {
-    "/api/arena/state": {},
-    "/api/arena/stream": {}
-  }
-}
