@@ -7,10 +7,10 @@ import {
 } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
 
-const PACKAGE_ID = "0xc16803b7fc3661faf22d0d46ac40b93cad4c05e5813689e9638ea67d18222eae";
-const TREASURY_ID = "0xc0a94c8a7cfe5bd28288ffce3d2d1d696ab9637bd1667f4c1d95dac55f452b2a";
+const PACKAGE_ID = "0x51abc7016876cd23efcd5a5240bc03ef0e3ed4538e0d87a029944d45cb3e4b81";
+const TREASURY_ID = "0x414bd328952f9ddfde568e0a256476a0e2e148b21b606892f07ea3dd4360baeb";
 const CLOCK_ID = "0x6";
-const DISPLAY_ID = "0xd66637cb70bce048659edda2f0c9790a8d297a95f5138926a54bba270695f0f8";
+const DISPLAY_ID = "0xda8656ee556049f5c96579340240a7da76654d02daf4b49808d00c6432dd72d8";
 const RENDERER_BASE = "https://heart-beat-production.up.railway.app";
 const SUI_DECIMALS = 1_000_000_000;
 
