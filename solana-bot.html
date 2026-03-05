@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Solana Arbitrage Control Deck</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Space+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #050912;
+        --bg2: #0e1626;
+        --panel: rgba(10, 18, 31, 0.86);
+        --line: rgba(130, 165, 205, 0.28);
+        --text: #e9f2ff;
+        --muted: #9cb4d2;
+        --brand: #4bc5ff;
+        --accent: #ffd66d;
+        --ok: #48d694;
+        --warn: #ffb24d;
+        --bad: #ff6d6d;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+
+      body {
+        font-family: "Outfit", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(1200px circle at 8% -10%, rgba(75, 197, 255, 0.2), transparent 35%),
+          radial-gradient(900px circle at 110% 110%, rgba(255, 214, 109, 0.15), transparent 40%),
+          linear-gradient(145deg, var(--bg), var(--bg2));
+      }
+
+      main {
+        width: min(1240px, calc(100% - 24px));
+        margin: 16px auto 24px;
+        display: grid;
+        gap: 12px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px;
+        background: var(--panel);
+        backdrop-filter: blur(8px);
+      }
+
+      h1,
+      h2 {
+        margin: 0 0 10px;
+      }
+
+      h1 {
+        font-size: clamp(1.3rem, 2.3vw, 2rem);
+        letter-spacing: 0.02em;
+      }
+
+      h2 {
+        font-size: 0.98rem;
+        color: var(--muted);
+      }
+
+      p {
+        margin: 0;
+      }
+
+      .small {
+        color: var(--muted);
+        font-size: 0.82rem;
+      }
+
+      .grid {
+        display: grid;
+        gap: 10px;
+      }
+
+      .grid-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .grid-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .field {
+        display: grid;
+        gap: 5px;
+      }
+
+      label {
+        color: var(--muted);
+        font-size: 0.74rem;
+      }
+
+      input,
+      select,
+      textarea,
+      button {
+        width: 100%;
+        border-radius: 9px;
+        border: 1px solid var(--line);
+        padding: 9px 10px;
+        font: inherit;
+        color: var(--text);
+        background: rgba(6, 12, 21, 0.95);
+      }
+
+      textarea {
+        min-height: 90px;
+        resize: vertical;
+        font-family: "Space Mono", monospace;
+        font-size: 0.76rem;
+      }
+
+      button {
+        cursor: pointer;
+        width: auto;
+        background: linear-gradient(135deg, rgba(75, 197, 255, 0.18), rgba(255, 214, 109, 0.16));
+      }
+
+      button:hover {
+        border-color: rgba(177, 216, 255, 0.6);
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      #runtime-badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 4px 10px;
+        border: 1px solid var(--line);
+        font-size: 0.78rem;
+        margin-bottom: 8px;
+      }
+
+      #runtime-badge[data-state="running"] {
+        color: var(--ok);
+        border-color: rgba(72, 214, 148, 0.45);
+      }
+
+      #runtime-badge[data-state="stopped"] {
+        color: var(--warn);
+        border-color: rgba(255, 178, 77, 0.45);
+      }
+
+      #flash {
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        padding: 8px 10px;
+        font-size: 0.8rem;
+      }
+
+      #flash[data-type="ok"] {
+        color: var(--ok);
+      }
+
+      #flash[data-type="warn"] {
+        color: var(--warn);
+      }
+
+      #flash[data-type="error"] {
+        color: var(--bad);
+      }
+
+      #logs {
+        font-family: "Space Mono", monospace;
+        font-size: 0.72rem;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        min-height: 220px;
+        max-height: 360px;
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px;
+        background: rgba(4, 9, 15, 0.94);
+      }
+
+      .mono {
+        font-family: "Space Mono", monospace;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+
+      @media (max-width: 980px) {
+        .grid-2,
+        .grid-3 {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="card">
+        <h1>Solana Arbitrage Control Deck</h1>
+        <p class="small">
+          Local controller for cross-DEX arbitrage scanning/execution. This setup does not implement mempool
+          front-running or sandwich strategies.
+        </p>
+      </section>
+
+      <section class="card grid">
+        <h2>Runtime</h2>
+        <span id="runtime-badge" data-state="stopped">Stopped</span>
+        <p id="runtime-meta" class="small mono">No process.</p>
+        <p id="last-scan" class="small mono">No completed scan yet.</p>
+        <div class="actions">
+          <button id="btn-refresh" type="button">Refresh</button>
+          <button id="btn-scan" type="button">Run Safe Scan</button>
+          <button id="btn-start" type="button">Start Bot Loop</button>
+          <button id="btn-stop" type="button">Stop Bot Loop</button>
+        </div>
+      </section>
+
+      <section class="card grid">
+        <h2>Wallet</h2>
+        <p id="wallet-summary" class="small mono">No wallet loaded.</p>
+        <div class="field">
+          <label for="wallet-private-key">Secret key (JSON bytes, CSV bytes, base58, or base64)</label>
+          <textarea id="wallet-private-key" placeholder="[12,34,...]" spellcheck="false"></textarea>
+        </div>
+        <div class="actions">
+          <button id="btn-wallet-import" type="button">Import Wallet</button>
+          <button id="btn-wallet-clear" type="button">Clear Wallet</button>
+          <button id="btn-wallet-refresh" type="button">Refresh Balance</button>
+        </div>
+      </section>
+
+      <section class="card grid">
+        <h2>Config</h2>
+        <div class="grid grid-3">
+          <label class="field"><span>RPC URL</span><input id="cfg-rpc-url" type="text" /></label>
+          <label class="field"><span>WS URL (optional)</span><input id="cfg-ws-url" type="text" /></label>
+          <label class="field"><span>Jupiter API</span><input id="cfg-jupiter" type="text" /></label>
+          <label class="field"><span>Cycle interval ms</span><input id="cfg-cycle" type="number" min="250" /></label>
+          <label class="field"
+            ><span>Quote timeout ms</span><input id="cfg-quote-timeout" type="number" min="250"
+          /></label>
+          <label class="field"
+            ><span>Max concurrent quotes</span><input id="cfg-max-quotes" type="number" min="1"
+          /></label>
+          <label class="field"><span>Slippage bps</span><input id="cfg-slippage" type="number" min="1" /></label>
+          <label class="field"
+            ><span>Min profit bps</span><input id="cfg-min-profit-bps" type="number" min="1"
+          /></label>
+          <label class="field"><span>Min profit (atomic)</span><input id="cfg-min-profit-atomic" type="text" /></label>
+          <label class="field"
+            ><span>Compute unit limit</span><input id="cfg-compute-limit" type="number" min="200000"
+          /></label>
+          <label class="field"
+            ><span>Compute unit price (micro lamports)</span><input id="cfg-compute-price" type="number" min="0"
+          /></label>
+          <label class="field"
+            ><span>Commitment</span
+            ><select id="cfg-commitment">
+              <option value="processed">processed</option>
+              <option value="confirmed">confirmed</option>
+              <option value="finalized">finalized</option>
+            </select></label
+          >
+          <label class="field"
+            ><span>Dry run</span
+            ><select id="cfg-dry-run">
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select></label
+          >
+          <label class="field"
+            ><span>Auto execute</span
+            ><select id="cfg-auto-execute">
+              <option value="false">false</option>
+              <option value="true">true</option>
+            </select></label
+          >
+          <label class="field"
+            ><span>Live trading enabled</span
+            ><select id="cfg-live-enabled">
+              <option value="false">false</option>
+              <option value="true">true</option>
+            </select></label
+          >
+          <label class="field"
+            ><span>Re-quote before execute</span
+            ><select id="cfg-requote">
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select></label
+          >
+          <label class="field"
+            ><span>Preflight simulation</span
+            ><select id="cfg-preflight">
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select></label
+          >
+        </div>
+
+        <div class="grid grid-2">
+          <label class="field"
+            ><span>DEX filters (comma or newline separated)</span>
+            <textarea id="cfg-dexes" spellcheck="false"></textarea>
+          </label>
+          <label class="field"
+            ><span>Routes JSON (`name`, `baseMint`, `midMint`, `tradeAmountAtomic`)</span>
+            <textarea id="cfg-routes" spellcheck="false"></textarea>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="btn-save-config" type="button">Save Config</button>
+        </div>
+      </section>
+
+      <section class="card grid">
+        <h2>Activity</h2>
+        <p id="flash" class="mono">Loading status…</p>
+        <div id="logs"></div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/solana-bot-ui.js"></script>
+  </body>
+</html>

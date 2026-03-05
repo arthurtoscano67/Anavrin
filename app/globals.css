@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  font-family: "Avenir Next", "Segoe UI", "Trebuchet MS", sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: "Futura", "Avenir Next Condensed", "Trebuchet MS", sans-serif;
+}
+
+.panel {
+  @apply rounded-2xl border border-white/10 bg-storm/65 p-5 shadow-card;
+}
+
+.input {
+  @apply w-full rounded-lg border border-white/15 bg-ink/80 px-3 py-2 text-sm text-white placeholder:text-mist/55 focus:border-pulse/60 focus:outline-none;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center rounded-lg border px-3 py-2 text-sm font-medium transition;
+}
+
+.btn-primary {
+  @apply border-pulse/70 bg-pulse/20 text-pulse hover:bg-pulse/30;
+}
+
+.btn-secondary {
+  @apply border-white/20 bg-white/5 text-mist hover:border-pulse/40 hover:text-white;
+}
+
+.btn-danger {
+  @apply border-ember/60 bg-ember/15 text-ember hover:bg-ember/25;
+}
