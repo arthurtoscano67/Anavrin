@@ -47,6 +47,7 @@ export function ArenaPage() {
   const [activeMatch, setActiveMatch] = useState<ArenaMatch | null>(null);
   const [resolution, setResolution] = useState<MatchResolution | null>(null);
   const [pending, setPending] = useState<string | null>(null);
+  const [handledLobbyStartId, setHandledLobbyStartId] = useState<string | null>(null);
 
   useEffect(() => {
     const m = params.get("match");
@@ -85,6 +86,8 @@ export function ArenaPage() {
     monsterName: selectedMonster?.name ?? "Unknown",
     level: Math.max(1, (selectedMonster?.stage ?? 0) + 1),
   });
+  const pendingMatchStart = lobby.pendingMatchStart;
+  const clearPendingMatchStart = lobby.clearPendingMatchStart;
 
   const loadMatch = useCallback(async (matchId: string) => {
     if (!matchId) return;
@@ -115,8 +118,9 @@ export function ArenaPage() {
 
   useEffect(() => {
     if (!account?.address) return;
-    const started = lobby.pendingMatchStart;
+    const started = pendingMatchStart;
     if (!started) return;
+    if (handledLobbyStartId === started.id) return;
     if (started.from !== account.address && started.to !== account.address) return;
 
     const opponentAddress = started.from === account.address ? started.to : started.from;
@@ -126,15 +130,20 @@ export function ArenaPage() {
       setJoinMatchId(started.matchId);
       upsertMatchQueryParam(started.matchId);
       void loadMatch(started.matchId);
+      toast.success(`Lobby match ready with ${short(opponentAddress)}. Deposit your legend now.`);
+      clearPendingMatchStart();
+    } else {
+      toast.message(`Invite accepted with ${short(opponentAddress)}. Waiting for on-chain match room...`);
     }
-
-    toast.success(
-      started.matchId
-        ? `Lobby match ready with ${short(opponentAddress)}`
-        : `Lobby duel confirmed with ${short(opponentAddress)}. Create the on-chain match.`
-    );
-    lobby.clearPendingMatchStart();
-  }, [account?.address, loadMatch, lobby.clearPendingMatchStart, lobby.pendingMatchStart, upsertMatchQueryParam]);
+    setHandledLobbyStartId(started.id);
+  }, [
+    account?.address,
+    clearPendingMatchStart,
+    handledLobbyStartId,
+    loadMatch,
+    pendingMatchStart,
+    upsertMatchQueryParam,
+  ]);
 
   const onCreateMatch = async () => {
     if (!account) {
@@ -369,6 +378,24 @@ export function ArenaPage() {
     toast.success(`Invite accepted: ${short(invite.from)}`);
   };
 
+  const onResetArenaFlow = () => {
+    setOpponent("");
+    setJoinMatchId("");
+    setJoinStake("");
+    setCreateStake("");
+    setActiveMatch(null);
+    setResolution(null);
+    setHandledLobbyStartId(null);
+    clearPendingMatchStart();
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("match");
+      next.delete("monster");
+      return next;
+    });
+    toast.message("Arena flow reset. Pick your next move.");
+  };
+
   const canStartBattle =
     activeMatch &&
     activeMatch.status === 1 &&
@@ -388,6 +415,22 @@ export function ArenaPage() {
         ? Boolean(activeMatch.mon_a)
         : Boolean(activeMatch.mon_b)
       : false;
+  const opponentHasDeposited =
+    activeMatch && userSide
+      ? userSide === "a"
+        ? Boolean(activeMatch.mon_b)
+        : Boolean(activeMatch.mon_a)
+      : false;
+  const bothDeposited = Boolean(activeMatch?.mon_a && activeMatch?.mon_b);
+  const awaitingRoomCreation = Boolean(
+    pendingMatchStart &&
+    !pendingMatchStart.matchId &&
+    account &&
+    (account.address === pendingMatchStart.from || account.address === pendingMatchStart.to)
+  );
+  const incomingInviteCount = lobby.invites.filter(
+    (invite) => invite.to === account?.address && invite.status === "pending"
+  ).length;
   const isPlayerInMatch =
     activeMatch &&
     account &&
@@ -396,6 +439,53 @@ export function ArenaPage() {
     activeMatch &&
     activeMatch.status === 0 &&
     isPlayerInMatch;
+  const lockCreateActions = Boolean(
+    activeMatch &&
+    isPlayerInMatch &&
+    activeMatch.status !== 2 &&
+    activeMatch.status !== 3
+  );
+  const coachStatusTone = currentMatchId || activeMatch || awaitingRoomCreation ? "text-cyan" : "text-gray-300";
+
+  const yourNextAction = useMemo(() => {
+    if (!account) return "Connect wallet to start.";
+    if (awaitingRoomCreation) return "Wait for the shared match room to be created.";
+    if (!activeMatch) {
+      if (!opponent.trim()) return "Invite a player from Arena Lobby or paste their wallet address.";
+      return "Press Create Match to open the battle room.";
+    }
+    if (!isPlayerInMatch) return "You are spectating. Load your own match to play.";
+    if (activeMatch.status === 2) return "Battle finished. Check result and leaderboard.";
+    if (activeMatch.status === 3) return "Match cancelled. Press Back To Lobby to start again.";
+    if (!userHasDeposited) return "Deposit your legend to lock your side in.";
+    if (!bothDeposited) return "Wait for opponent deposit, or withdraw if they disappear.";
+    if (canStartBattle) return "Tap Start Battle now.";
+    return "Both ready. Waiting for someone to press Start Battle.";
+  }, [
+    account,
+    activeMatch,
+    awaitingRoomCreation,
+    bothDeposited,
+    canStartBattle,
+    isPlayerInMatch,
+    opponent,
+    userHasDeposited,
+  ]);
+
+  const opponentNextAction = useMemo(() => {
+    if (awaitingRoomCreation) return "Opponent accepted invite and is waiting for room creation.";
+    if (!activeMatch) {
+      return opponent.trim()
+        ? "Opponent should accept invite and wait for match room."
+        : "No opponent selected yet.";
+    }
+    if (activeMatch.status === 2) return "Opponent already finished this battle.";
+    if (activeMatch.status === 3) return "Opponent left or match was cancelled.";
+    if (!opponentHasDeposited) return "Opponent needs to deposit their legend.";
+    if (!userHasDeposited) return "Opponent is ready and waiting for your deposit.";
+    if (bothDeposited) return "Opponent is ready. Battle can start now.";
+    return "Opponent is setting up now.";
+  }, [activeMatch, awaitingRoomCreation, bothDeposited, opponent, opponentHasDeposited, userHasDeposited]);
 
   const monsterMap = useMemo(
     () => new Map((walletMonsters.data ?? []).map((monster) => [monster.objectId, monster])),
@@ -437,6 +527,64 @@ export function ArenaPage() {
       .slice(0, 8);
   }, [lobby.recentMatches, recentMatches.data]);
 
+  const coachSteps = useMemo(() => {
+    const hasOpponent = Boolean(opponent.trim());
+    return [
+      {
+        id: "invite",
+        title: "Invite + Accept",
+        icon: "📨",
+        done: hasOpponent || awaitingRoomCreation || Boolean(activeMatch),
+        current: !hasOpponent && !awaitingRoomCreation && !activeMatch,
+        help: incomingInviteCount
+          ? `You have ${incomingInviteCount} invite${incomingInviteCount > 1 ? "s" : ""} waiting in Arena Lobby.`
+          : "Tap Invite in Arena Lobby or paste opponent address.",
+      },
+      {
+        id: "room",
+        title: "Create Match Room",
+        icon: "🏟️",
+        done: Boolean(activeMatch),
+        current: (hasOpponent || awaitingRoomCreation) && !activeMatch,
+        help: awaitingRoomCreation
+          ? "Your invite was accepted. Waiting for the match room to appear."
+          : "Create Match to open a shared battle room on-chain.",
+      },
+      {
+        id: "deposit",
+        title: "Deposit Your Legend",
+        icon: "🧩",
+        done: userHasDeposited,
+        current: Boolean(activeMatch) && !userHasDeposited,
+        help: userHasDeposited
+          ? "Great! Your legend is locked in safely."
+          : "Choose your legend and tap Deposit To Match.",
+      },
+      {
+        id: "wait",
+        title: "Opponent Deposit",
+        icon: "👥",
+        done: bothDeposited,
+        current: userHasDeposited && !bothDeposited,
+        help: bothDeposited
+          ? "Both legends are ready."
+          : "Wait for your opponent to deposit. You can withdraw before lock if needed.",
+      },
+      {
+        id: "battle",
+        title: "Start Battle",
+        icon: "⚔️",
+        done: activeMatch?.status === 2,
+        current: Boolean(canStartBattle),
+        help: canStartBattle
+          ? "Everything is ready. Tap Start Battle."
+          : "Battle starts when both legends and stakes are in place.",
+      },
+    ];
+  }, [activeMatch, awaitingRoomCreation, bothDeposited, canStartBattle, incomingInviteCount, opponent, userHasDeposited]);
+
+  const currentCoachStep = coachSteps.find((step) => step.current) ?? coachSteps.find((step) => !step.done) ?? coachSteps[coachSteps.length - 1];
+
   return (
     <PageShell
       title="Arena"
@@ -448,9 +596,78 @@ export function ArenaPage() {
             Create Match | Join Match
           </div>
 
+          <div className="glass-card overflow-hidden border-purple/35 bg-gradient-to-r from-purple/20 via-surface to-cyan/15 p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="text-base font-extrabold text-white">Battle Coach</div>
+              <div className={`rounded-full border border-cyan/40 bg-cyan/20 px-3 py-1 text-xs font-semibold ${coachStatusTone}`}>
+                Next: {currentCoachStep.title}
+              </div>
+            </div>
+
+            <div className="no-scrollbar mb-3 flex gap-2 overflow-x-auto pb-1">
+              {coachSteps.map((step) => (
+                <div
+                  key={step.id}
+                  className={`min-w-[150px] rounded-xl border px-3 py-2 text-xs transition ${
+                    step.current
+                      ? "border-cyan/50 bg-cyan/20 text-cyan animate-pulse"
+                      : step.done
+                        ? "border-green-400/45 bg-green-500/15 text-green-300"
+                        : "border-borderSoft bg-black/20 text-gray-300"
+                  }`}
+                >
+                  <div className="mb-1 font-semibold">
+                    {step.icon} {step.title}
+                  </div>
+                  <div className="text-[11px] text-gray-300">{step.help}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-xl border border-borderSoft/70 bg-black/20 px-3 py-2 text-xs text-gray-200">
+              {currentCoachStep.help}
+            </div>
+
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="rounded-xl border border-cyan/35 bg-cyan/10 px-3 py-2 text-xs">
+                <div className="mb-1 font-semibold text-cyan">You</div>
+                <p className="text-gray-100">{yourNextAction}</p>
+              </div>
+              <div className="rounded-xl border border-purple/35 bg-purple/10 px-3 py-2 text-xs">
+                <div className="mb-1 font-semibold text-purple-100">Opponent</div>
+                <p className="text-gray-100">{opponentNextAction}</p>
+              </div>
+            </div>
+
+            <details className="mt-3 rounded-xl border border-borderSoft/70 bg-black/20 px-3 py-2 text-xs text-gray-300">
+              <summary className="cursor-pointer font-semibold text-gray-100">Need help? Kid-friendly steps</summary>
+              <div className="mt-2 space-y-1">
+                <p>1. Pick a friend in Arena Lobby and press Invite.</p>
+                <p>2. When they accept, create or load the match room.</p>
+                <p>3. Deposit your legend. Wait until both sides show Ready.</p>
+                <p>4. Press Start Battle. Watch result, then check Leaderboard.</p>
+              </div>
+            </details>
+
+            <div className="mt-3 flex justify-end">
+              <button
+                className="btn-ghost text-xs"
+                onClick={onResetArenaFlow}
+                disabled={pending !== null}
+              >
+                Back To Lobby
+              </button>
+            </div>
+          </div>
+
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="glass-card space-y-4 p-4">
               <h2 className="text-lg font-bold">Create Match</h2>
+              {lockCreateActions ? (
+                <div className="rounded-xl border border-yellow-400/40 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
+                  You are already in an active match. Finish this one or press Back To Lobby before creating a new match.
+                </div>
+              ) : null}
               <div className="space-y-2">
                 <label className="text-xs text-gray-400">Opponent Address</label>
                 <input
@@ -458,6 +675,7 @@ export function ArenaPage() {
                   placeholder="0x..."
                   value={opponent}
                   onChange={(e) => setOpponent(e.target.value)}
+                  disabled={lockCreateActions || pending !== null}
                 />
               </div>
 
@@ -467,6 +685,7 @@ export function ArenaPage() {
                   className="input"
                   value={createMonsterId}
                   onChange={(e) => setCreateMonsterId(e.target.value)}
+                  disabled={lockCreateActions || pending !== null}
                 >
                   <option value="">Select monster</option>
                   {(walletMonsters.data ?? []).map((m) => (
@@ -484,10 +703,15 @@ export function ArenaPage() {
                   placeholder="0.0"
                   value={createStake}
                   onChange={(e) => setCreateStake(e.target.value)}
+                  disabled={lockCreateActions || pending !== null}
                 />
               </div>
 
-              <button className="btn-primary w-full" onClick={onCreateMatch} disabled={!account || pending !== null}>
+              <button
+                className="btn-primary w-full"
+                onClick={onCreateMatch}
+                disabled={!account || pending !== null || lockCreateActions}
+              >
                 {pending === "create" ? <span className="inline-flex items-center gap-2"><Spinner /> Creating...</span> : "Create & Send Invite"}
               </button>
             </div>
@@ -501,6 +725,7 @@ export function ArenaPage() {
                   placeholder="0x..."
                   value={joinMatchId}
                   onChange={(e) => setJoinMatchId(e.target.value)}
+                  disabled={lockCreateActions || pending !== null}
                 />
               </div>
 
@@ -583,6 +808,12 @@ export function ArenaPage() {
               <p className="text-xs text-gray-400">
                 Spectator mode: anyone can load a match by ID and watch status + final outcome.
               </p>
+
+              {lockCreateActions && (
+                <p className="text-xs text-cyan">
+                  Active match lock is on to avoid mistakes. Use Back To Lobby if you need to switch matches.
+                </p>
+              )}
             </div>
           </div>
 
@@ -682,6 +913,13 @@ export function ArenaPage() {
                   >
                     {pending === "battle" ? <span className="inline-flex items-center gap-2"><Spinner /> Resolving...</span> : "Start Battle"}
                   </button>
+                  <button
+                    className="btn-ghost"
+                    onClick={onResetArenaFlow}
+                    disabled={pending !== null}
+                  >
+                    Back To Lobby
+                  </button>
                 </div>
                 <p className="text-xs text-gray-400">
                   If your opponent goes offline before both legends are deposited, use Withdraw to reclaim your monster and stake.
@@ -777,7 +1015,7 @@ export function ArenaPage() {
           openMatches={lobby.openMatches}
           invites={lobby.invites}
           recentMatches={lobby.recentMatches}
-          busy={pending !== null}
+          busy={pending !== null || lockCreateActions}
           onInvite={onInvitePlayer}
           onCreateOpenMatch={onCreateOpenLobbyMatch}
           onJoinOpenMatch={onJoinOpenLobbyMatch}
