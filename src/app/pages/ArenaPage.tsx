@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useCurrentAccount, useSuiClient } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
 import { Link, useSearchParams } from "react-router-dom";
@@ -68,6 +68,10 @@ export function ArenaPage() {
   const [pending, setPending] = useState<string | null>(null);
   const [handledLobbyStartId, setHandledLobbyStartId] = useState<string | null>(null);
   const [recoveringMatch, setRecoveringMatch] = useState(false);
+  const lobbySectionRef = useRef<HTMLDivElement | null>(null);
+  const roomSectionRef = useRef<HTMLDivElement | null>(null);
+  const liveSectionRef = useRef<HTMLDivElement | null>(null);
+  const historySectionRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const m = params.get("match");
@@ -539,6 +543,20 @@ export function ArenaPage() {
     toast.message("Arena flow reset. Pick your next move.");
   };
 
+  const scrollToSection = useCallback((ref: RefObject<HTMLDivElement | null>) => {
+    ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
+  const setArenaMonster = useCallback((monsterId: string) => {
+    setCreateMonsterId(monsterId);
+    setJoinMonsterId(monsterId);
+  }, []);
+
+  const setArenaStake = useCallback((stake: string) => {
+    setCreateStake(stake);
+    setJoinStake(stake);
+  }, []);
+
   const canStartBattle =
     activeMatch &&
     activeMatch.status === 1 &&
@@ -610,6 +628,31 @@ export function ArenaPage() {
             : userHasDeposited
               ? "Your legend is locked in. Waiting for the other trainer to ready up."
               : "This room is live. Deposit your legend and matching wager to enter.";
+  const selectedArenaMonsterId = currentMatchId ? joinMonsterId : createMonsterId;
+  const selectedArenaStake = currentMatchId ? joinStake : createStake;
+  const canOpenRoom = Boolean(
+    account &&
+    opponent.trim() &&
+    createMonsterId &&
+    !activeMatch &&
+    !awaitingRoomCreation &&
+    !lockCreateActions
+  );
+  const openRoomButtonLabel = pending === "create"
+    ? "Opening Room..."
+    : awaitingRoomCreation
+      ? "Creating Room..."
+      : activeMatch
+        ? "Room Ready"
+        : opponent.trim()
+          ? "Open Battle Room"
+          : "Invite A Trainer";
+  const mobileSectionButtons = [
+    { id: "lobby", label: "Lobby", ref: lobbySectionRef },
+    { id: "room", label: "Room", ref: roomSectionRef },
+    { id: "live", label: "Live", ref: liveSectionRef },
+    { id: "history", label: "History", ref: historySectionRef },
+  ];
 
   const yourNextAction = useMemo(() => {
     if (!account) return "Connect wallet to start.";
@@ -737,8 +780,20 @@ export function ArenaPage() {
       title="Arena"
       subtitle="Create and join live PvP matches. Every battle settles on-chain with real staking and permanent monster progression."
     >
+      <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1 md:hidden">
+        {mobileSectionButtons.map((section) => (
+          <button
+            key={section.id}
+            className="btn-ghost min-h-11 shrink-0 rounded-full px-4 text-sm"
+            onClick={() => scrollToSection(section.ref)}
+          >
+            {section.label}
+          </button>
+        ))}
+      </div>
+
       <div className="grid gap-4 xl:grid-cols-[1.1fr_0.95fr] xl:items-start">
-        <div className="order-1 xl:order-2">
+        <div className="order-1 xl:order-2" ref={lobbySectionRef}>
           <ArenaLobby
             selfAddress={account?.address}
             connectionState={lobby.connectionState}
@@ -771,6 +826,65 @@ export function ArenaPage() {
               </div>
               <div className="rounded-full border border-cyan/40 bg-cyan/15 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan">
                 {roomStatusLabel}
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
+              <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gray-400">Quick setup</div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400">Your legend</label>
+                    <select
+                      className="input min-h-12"
+                      value={selectedArenaMonsterId}
+                      onChange={(e) => setArenaMonster(e.target.value)}
+                      disabled={pending !== null || recoveringMatch || userHasDeposited}
+                    >
+                      <option value="">Select legend</option>
+                      {(walletMonsters.data ?? []).map((monster) => (
+                        <option value={monster.objectId} key={monster.objectId}>
+                          {monster.name} ({short(monster.objectId)})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400">Wager (SUI)</label>
+                    <input
+                      className="input min-h-12"
+                      placeholder="0.0"
+                      value={selectedArenaStake}
+                      onChange={(e) => setArenaStake(e.target.value)}
+                      disabled={pending !== null || recoveringMatch || userHasDeposited}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-[20px] border border-white/8 bg-white/5 px-3 py-3 text-sm text-gray-300">
+                  {activeMatch
+                    ? "Room loaded. Ready up from the buttons below when your legend and wager look right."
+                    : opponent.trim()
+                      ? `Opponent locked: ${short(opponent)}`
+                      : "Pick a trainer from the lobby to auto-fill the opponent."}
+                </div>
+              </div>
+
+              <div className="grid gap-3">
+                <button
+                  className="btn-primary min-h-14 text-base"
+                  onClick={onCreateMatch}
+                  disabled={!canOpenRoom || pending !== null || recoveringMatch}
+                >
+                  {openRoomButtonLabel}
+                </button>
+                <button
+                  className="btn-ghost min-h-14 text-base"
+                  onClick={() => scrollToSection(lobbySectionRef)}
+                >
+                  Browse Lobby
+                </button>
               </div>
             </div>
 
@@ -823,7 +937,7 @@ export function ArenaPage() {
             </details>
           </div>
 
-          <div className="glass-card space-y-4 p-4 sm:p-5">
+          <div className="glass-card space-y-4 p-4 sm:p-5" ref={roomSectionRef}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.26em] text-cyan/80">Ready Room</div>
@@ -1130,7 +1244,7 @@ export function ArenaPage() {
             </div>
           </details>
 
-          <div className="glass-card space-y-3 p-4">
+          <div className="glass-card space-y-3 p-4" ref={liveSectionRef}>
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-lg font-bold">Live Battles</h3>
               <span className="rounded-full border border-cyan/35 bg-cyan/10 px-3 py-1 text-xs font-semibold text-cyan">
@@ -1173,7 +1287,7 @@ export function ArenaPage() {
             )}
           </div>
 
-          <div className="glass-card space-y-3 p-4">
+          <div className="glass-card space-y-3 p-4" ref={historySectionRef}>
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-lg font-bold">Recent Fights</h3>
               <Link to="/leaderboard" className="btn-ghost text-xs">

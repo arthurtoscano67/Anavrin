@@ -40,6 +40,7 @@ export type ArenaStatus = 0 | 1 | 2 | 3;
 export type ArenaMonsterSnapshot = {
   objectId: string;
   name: string;
+  seed: string;
   stage: number;
   attack: number;
   defense: number;

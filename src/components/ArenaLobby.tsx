@@ -119,7 +119,7 @@ export function ArenaLobby({
             value={stakeInput}
             onChange={(event) => setStakeInput(event.target.value)}
           />
-          <button className="btn-secondary min-h-12" onClick={submitOpenMatch} disabled={!isConnected || busy}>
+          <button className="btn-secondary min-h-14 text-base" onClick={submitOpenMatch} disabled={!isConnected || busy}>
             Post Open Match
           </button>
         </div>
@@ -169,7 +169,7 @@ export function ArenaLobby({
                 </div>
 
                 <button
-                  className="btn-primary mt-4 min-h-12 w-full"
+                  className="btn-primary mt-4 min-h-14 w-full text-base"
                   onClick={() => onInvite(player.address)}
                   disabled={!isConnected || busy}
                 >
@@ -211,7 +211,7 @@ export function ArenaLobby({
                     </span>
                   </div>
                   <button
-                    className="btn-primary mt-4 min-h-12 w-full"
+                    className="btn-primary mt-4 min-h-14 w-full text-base"
                     onClick={() => onAcceptInvite(invite)}
                     disabled={!isConnected || busy}
                   >
@@ -252,7 +252,7 @@ export function ArenaLobby({
                     </span>
                   </div>
                   <button
-                    className="btn-secondary mt-4 min-h-12 w-full"
+                    className="btn-secondary mt-4 min-h-14 w-full text-base"
                     onClick={() => onJoinOpenMatch(match)}
                     disabled={!isConnected || busy}
                   >

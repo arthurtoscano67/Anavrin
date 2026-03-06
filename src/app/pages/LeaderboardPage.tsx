@@ -22,7 +22,7 @@ export function LeaderboardPage() {
           {(leaderboard.data ?? []).map((monster, idx) => (
             <div key={monster.objectId} className="glass-card grid gap-3 p-3 sm:grid-cols-[80px_1fr_auto] sm:items-center">
               <div className="relative">
-                <MonsterImage objectId={monster.objectId} className="aspect-square max-w-[80px]" />
+                <MonsterImage objectId={monster.objectId} monster={monster} className="aspect-square max-w-[80px]" />
                 <div className="absolute -left-2 -top-2 grid h-7 w-7 place-items-center rounded-full border border-purple/40 bg-purple/20 text-xs font-bold">
                   #{idx + 1}
                 </div>

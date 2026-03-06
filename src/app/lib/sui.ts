@@ -69,6 +69,7 @@ function parseEmbeddedArenaMonster(value: unknown): ArenaMonsterSnapshot | null 
   return {
     objectId,
     name: String(fields.name ?? "Unknown"),
+    seed: String(fields.seed ?? "0"),
     stage: Number(fields.stage ?? 0),
     attack: Number(fields.attack ?? 0),
     defense: Number(fields.defense ?? 0),

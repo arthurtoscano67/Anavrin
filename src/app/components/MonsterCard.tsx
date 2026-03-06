@@ -22,7 +22,7 @@ export function MonsterCard({
 
   return (
     <article className="glass-card card-hover overflow-hidden">
-      <MonsterImage objectId={monster.objectId} className="aspect-square" />
+      <MonsterImage objectId={monster.objectId} monster={monster} className="aspect-square" />
       <div className="space-y-3 p-4">
         <div className="flex items-center justify-between gap-2">
           <h3 className="truncate text-sm font-semibold text-white">{monster.name}</h3>

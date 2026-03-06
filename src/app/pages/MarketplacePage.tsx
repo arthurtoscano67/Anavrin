@@ -100,7 +100,7 @@ export function MarketplacePage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {(listedMonsters.data ?? []).map((monster) => (
             <article key={`${monster.kioskId}-${monster.objectId}`} className="glass-card card-hover overflow-hidden">
-              <MonsterImage objectId={monster.objectId} className="aspect-square" />
+              <MonsterImage objectId={monster.objectId} monster={monster} className="aspect-square" />
               <div className="space-y-3 p-4">
                 <div className="flex items-center justify-between gap-2">
                   <div>

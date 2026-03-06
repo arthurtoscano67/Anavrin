@@ -24,6 +24,9 @@ export function MintPage() {
   const previewId = useMemo(() => {
     return minted?.objectId || mintPreviewId.data || walletMonsters.data?.[0]?.objectId || "";
   }, [mintPreviewId.data, minted?.objectId, walletMonsters.data]);
+  const previewMonster = useMemo(() => {
+    return minted ?? walletMonsters.data?.find((monster) => monster.objectId === previewId) ?? null;
+  }, [minted, previewId, walletMonsters.data]);
 
   const onMint = async () => {
     if (!account) return;
@@ -67,11 +70,11 @@ export function MintPage() {
             {minted && <StageBadge stage={minted.stage} />}
           </div>
           {previewId ? (
-            <MonsterImage objectId={previewId} className="aspect-square" />
+            <MonsterImage objectId={previewId} monster={previewMonster} className="aspect-square" />
           ) : (
             <div className="grid aspect-square place-items-center rounded-2xl border border-borderSoft bg-black/20 text-gray-500">No preview yet</div>
           )}
-          <p className="text-xs text-gray-400">SVG loads first; PNG fallback is used automatically if needed.</p>
+          <p className="text-xs text-gray-400">Procedural SVG is generated from the on-chain seed, stage, and battle traits.</p>
         </div>
 
         <div className="glass-card space-y-5 p-5">

@@ -76,6 +76,7 @@ export function ArenaMonsterPanel({
           <div className="arena-creature-glow" />
           <MonsterImage
             objectId={monster.objectId}
+            monster={monster}
             className={`relative z-10 mx-auto aspect-square h-32 w-32 border border-white/10 bg-black/40 sm:h-44 sm:w-44 ${side === "right" ? "scale-x-[-1]" : ""}`}
           />
           <div className="arena-blink" />

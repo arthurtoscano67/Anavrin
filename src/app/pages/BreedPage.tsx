@@ -152,7 +152,7 @@ export function BreedPage() {
               <h3 className="font-semibold">Parent A</h3>
               {parentAMonster ? (
                 <>
-                  <MonsterImage objectId={parentAMonster.objectId} className="aspect-square" />
+                  <MonsterImage objectId={parentAMonster.objectId} monster={parentAMonster} className="aspect-square" />
                   <div className="text-sm">
                     <div className="font-semibold">{parentAMonster.name}</div>
                     <div className="text-xs text-gray-400">{short(parentAMonster.objectId)}</div>
@@ -167,7 +167,7 @@ export function BreedPage() {
               <h3 className="font-semibold">Parent B</h3>
               {parentBMonster ? (
                 <>
-                  <MonsterImage objectId={parentBMonster.objectId} className="aspect-square" />
+                  <MonsterImage objectId={parentBMonster.objectId} monster={parentBMonster} className="aspect-square" />
                   <div className="text-sm">
                     <div className="font-semibold">{parentBMonster.name}</div>
                     <div className="text-xs text-gray-400">{short(parentBMonster.objectId)}</div>
@@ -183,7 +183,7 @@ export function BreedPage() {
             <div className="glass-card space-y-4 p-4">
               <h3 className="text-lg font-bold text-cyan">Child Monster Minted</h3>
               <div className="grid gap-4 md:grid-cols-[220px_1fr]">
-                <MonsterImage objectId={child.objectId} className="aspect-square max-w-[220px]" />
+                <MonsterImage objectId={child.objectId} monster={child} className="aspect-square max-w-[220px]" />
                 <div className="space-y-2 text-sm">
                   <div>
                     <div className="text-xs text-gray-400">Name</div>
