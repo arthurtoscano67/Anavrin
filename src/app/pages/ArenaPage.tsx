@@ -588,7 +588,28 @@ export function ArenaPage() {
     activeMatch.status !== 2 &&
     activeMatch.status !== 3
   );
-  const coachStatusTone = currentMatchId || activeMatch || awaitingRoomCreation ? "text-cyan" : "text-gray-300";
+  const roomStatusLabel = recoveringMatch
+    ? "Syncing"
+    : activeMatch
+      ? statusLabel(activeMatch.status)
+      : awaitingRoomCreation
+        ? "Creating Room"
+        : "Lobby Open";
+  const arenaHeroMessage = awaitingRoomCreation
+    ? "Invite accepted. Hold tight while the shared room appears on-chain."
+    : !activeMatch
+      ? opponent.trim()
+        ? `Challenge ${short(opponent)} is lined up. Open the room and ready your legend.`
+        : "Start in the Arena Lobby. Tap Invite on a trainer card or join an open room."
+      : activeMatch.status === 2
+        ? "Battle complete. Review the result below or jump back into the lobby."
+        : activeMatch.status === 3
+          ? "This room was cancelled. Everyone got their legend and stake back."
+          : bothDeposited
+            ? "Both legends are glowing Ready. Either trainer can press Start Battle."
+            : userHasDeposited
+              ? "Your legend is locked in. Waiting for the other trainer to ready up."
+              : "This room is live. Deposit your legend and matching wager to enter.";
 
   const yourNextAction = useMemo(() => {
     if (!account) return "Connect wallet to start.";
@@ -686,7 +707,7 @@ export function ArenaPage() {
         current: Boolean(activeMatch) && !userHasDeposited,
         help: userHasDeposited
           ? "Great! Your legend is locked in safely."
-          : "Choose your legend and tap Deposit To Match.",
+          : "Choose your legend and tap Ready Up Legend.",
       },
       {
         id: "wait",
@@ -711,261 +732,157 @@ export function ArenaPage() {
     ];
   }, [activeMatch, awaitingRoomCreation, bothDeposited, canStartBattle, incomingInviteCount, opponent, userHasDeposited]);
 
-  const currentCoachStep = coachSteps.find((step) => step.current) ?? coachSteps.find((step) => !step.done) ?? coachSteps[coachSteps.length - 1];
-
   return (
     <PageShell
       title="Arena"
       subtitle="Create and join live PvP matches. Every battle settles on-chain with real staking and permanent monster progression."
     >
-      <div className="grid gap-4 xl:grid-cols-[1.35fr_1fr]">
-        <div className="space-y-4">
-          <div className="text-xs font-semibold uppercase tracking-wide text-gray-300">
-            Create Match | Join Match
-          </div>
+      <div className="grid gap-4 xl:grid-cols-[1.1fr_0.95fr] xl:items-start">
+        <div className="order-1 xl:order-2">
+          <ArenaLobby
+            selfAddress={account?.address}
+            connectionState={lobby.connectionState}
+            isConnected={lobby.isConnected}
+            endpoint={lobby.endpoint}
+            lastError={lobby.lastError}
+            players={lobby.players}
+            openMatches={lobby.openMatches}
+            invites={lobby.invites}
+            recentMatches={lobby.recentMatches}
+            busy={pending !== null || recoveringMatch || lockCreateActions}
+            onInvite={onInvitePlayer}
+            onCreateOpenMatch={onCreateOpenLobbyMatch}
+            onJoinOpenMatch={onJoinOpenLobbyMatch}
+            onAcceptInvite={onAcceptLobbyInvite}
+          />
+        </div>
 
-          <div className="glass-card overflow-hidden border-purple/35 bg-gradient-to-r from-purple/20 via-surface to-cyan/15 p-4">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div className="text-base font-extrabold text-white">Battle Coach</div>
-              <div className={`rounded-full border border-cyan/40 bg-cyan/20 px-3 py-1 text-xs font-semibold ${coachStatusTone}`}>
-                Next: {currentCoachStep.title}
+        <div className="order-2 space-y-4 pb-24 md:pb-0 xl:order-1">
+          <div className="glass-card overflow-hidden border-purple/35 bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.28),transparent_42%),linear-gradient(135deg,rgba(17,24,39,0.92),rgba(11,18,32,0.96))] p-4 sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-cyan/75">Arena Flow</div>
+                <h2 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">
+                  Invite. Ready up. Battle.
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-300">
+                  {arenaHeroMessage}
+                </p>
+              </div>
+              <div className="rounded-full border border-cyan/40 bg-cyan/15 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan">
+                {roomStatusLabel}
               </div>
             </div>
 
-            <div className="no-scrollbar mb-3 flex gap-2 overflow-x-auto pb-1">
+            <div className="no-scrollbar mt-4 flex gap-3 overflow-x-auto pb-1">
               {coachSteps.map((step) => (
                 <div
                   key={step.id}
-                  className={`min-w-[150px] rounded-xl border px-3 py-2 text-xs transition ${
+                  className={`min-w-[168px] rounded-[22px] border p-3 text-left transition ${
                     step.current
-                      ? "border-cyan/50 bg-cyan/20 text-cyan animate-pulse"
+                      ? "border-cyan/50 bg-cyan/20 text-cyan shadow-[0_0_28px_rgba(6,182,212,0.14)]"
                       : step.done
-                        ? "border-green-400/45 bg-green-500/15 text-green-300"
-                        : "border-borderSoft bg-black/20 text-gray-300"
+                        ? "border-green-400/45 bg-green-500/15 text-green-200"
+                        : "border-white/10 bg-black/20 text-gray-200"
                   }`}
                 >
-                  <div className="mb-1 font-semibold">
-                    {step.icon} {step.title}
-                  </div>
-                  <div className="text-[11px] text-gray-300">{step.help}</div>
+                  <div className="text-2xl">{step.icon}</div>
+                  <div className="mt-3 text-sm font-bold">{step.title}</div>
+                  <div className="mt-1 text-xs leading-5 text-gray-300">{step.help}</div>
                 </div>
               ))}
             </div>
 
-            <div className="rounded-xl border border-borderSoft/70 bg-black/20 px-3 py-2 text-xs text-gray-200">
-              {currentCoachStep.help}
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[22px] border border-cyan/35 bg-cyan/10 p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan/80">Your next move</div>
+                <div className="mt-3 flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-cyan/20 text-xl">🕹️</div>
+                  <p className="text-sm leading-6 text-white">{yourNextAction}</p>
+                </div>
+              </div>
+              <div className="rounded-[22px] border border-purple/35 bg-purple/10 p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-purple-100">Opponent status</div>
+                <div className="mt-3 flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-purple/20 text-xl">👀</div>
+                  <p className="text-sm leading-6 text-white">{opponentNextAction}</p>
+                </div>
+              </div>
             </div>
 
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <div className="rounded-xl border border-cyan/35 bg-cyan/10 px-3 py-2 text-xs">
-                <div className="mb-1 font-semibold text-cyan">You</div>
-                <p className="text-gray-100">{yourNextAction}</p>
-              </div>
-              <div className="rounded-xl border border-purple/35 bg-purple/10 px-3 py-2 text-xs">
-                <div className="mb-1 font-semibold text-purple-100">Opponent</div>
-                <p className="text-gray-100">{opponentNextAction}</p>
-              </div>
-            </div>
-
-            <details className="mt-3 rounded-xl border border-borderSoft/70 bg-black/20 px-3 py-2 text-xs text-gray-300">
-              <summary className="cursor-pointer font-semibold text-gray-100">Need help? Kid-friendly steps</summary>
-              <div className="mt-2 space-y-1">
-                <p>1. Pick a friend in Arena Lobby and press Invite.</p>
-                <p>2. When they accept, create or load the match room.</p>
-                <p>3. Deposit your legend. Wait until both sides show Ready.</p>
-                <p>4. Press Start Battle. Watch result, then check Leaderboard.</p>
+            <details className="mt-4 rounded-[22px] border border-white/10 bg-black/20 px-4 py-3 text-sm text-gray-300">
+              <summary className="cursor-pointer font-semibold text-white">
+                Tap for simple instructions
+              </summary>
+              <div className="mt-3 grid gap-2 sm:grid-cols-4">
+                <div className="rounded-2xl border border-white/8 bg-white/5 p-3">1. See a trainer in the lobby.</div>
+                <div className="rounded-2xl border border-white/8 bg-white/5 p-3">2. Send or accept an invite.</div>
+                <div className="rounded-2xl border border-white/8 bg-white/5 p-3">3. Ready up by depositing your legend.</div>
+                <div className="rounded-2xl border border-white/8 bg-white/5 p-3">4. When both say Ready, start the battle.</div>
               </div>
             </details>
-
-            <div className="mt-3 flex justify-end">
-              <button
-                className="btn-ghost text-xs"
-                onClick={onResetArenaFlow}
-                disabled={pending !== null || recoveringMatch}
-              >
-                Back To Lobby
-              </button>
-            </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="glass-card space-y-4 p-4">
-              <h2 className="text-lg font-bold">Create Match</h2>
-              {lockCreateActions ? (
-                <div className="rounded-xl border border-yellow-400/40 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
-                  You are already in an active match. Finish this one or press Back To Lobby before creating a new match.
-                </div>
-              ) : null}
-              <div className="space-y-2">
-                <label className="text-xs text-gray-400">Opponent Address</label>
-                <input
-                  className="input"
-                  placeholder="0x..."
-                  value={opponent}
-                  onChange={(e) => setOpponent(e.target.value)}
-                  disabled={lockCreateActions || pending !== null || recoveringMatch}
-                />
+          <div className="glass-card space-y-4 p-4 sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.26em] text-cyan/80">Ready Room</div>
+                <h3 className="mt-1 text-2xl font-black tracking-tight text-white">Battle Board</h3>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-300">
+                  This room updates live from Sui. Both trainers can see when the other legend is ready.
+                </p>
               </div>
-
-              <div className="space-y-2">
-                <label className="text-xs text-gray-400">Your Monster</label>
-                <select
-                  className="input"
-                  value={createMonsterId}
-                  onChange={(e) => setCreateMonsterId(e.target.value)}
-                  disabled={lockCreateActions || pending !== null || recoveringMatch}
-                >
-                  <option value="">Select monster</option>
-                  {(walletMonsters.data ?? []).map((m) => (
-                    <option value={m.objectId} key={m.objectId}>
-                      {m.name} ({short(m.objectId)})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs text-gray-400">Optional Stake (SUI)</label>
-                <input
-                  className="input"
-                  placeholder="0.0"
-                  value={createStake}
-                  onChange={(e) => setCreateStake(e.target.value)}
-                  disabled={lockCreateActions || pending !== null || recoveringMatch}
-                />
-              </div>
-
-              <button
-                className="btn-primary w-full"
-                onClick={onCreateMatch}
-                disabled={!account || pending !== null || recoveringMatch || lockCreateActions}
-              >
-                {pending === "create" ? <span className="inline-flex items-center gap-2"><Spinner /> Creating...</span> : "Create & Send Invite"}
-              </button>
-            </div>
-
-            <div className="glass-card space-y-4 p-4">
-              <h2 className="text-lg font-bold">Join / Spectate Match</h2>
-              {recoveringMatch && (
-                <div className="rounded-xl border border-cyan/35 bg-cyan/10 px-3 py-2 text-xs text-cyan">
-                  <span className="inline-flex items-center gap-2"><Spinner /> Recovering active arena match from blockchain...</span>
-                </div>
-              )}
-              <div className="space-y-2">
-                <label className="text-xs text-gray-400">ArenaMatch Object ID</label>
-                <input
-                  className="input"
-                  placeholder="0x..."
-                  value={joinMatchId}
-                  onChange={(e) => setJoinMatchId(e.target.value)}
-                  disabled={lockCreateActions || pending !== null || recoveringMatch}
-                />
-              </div>
-
-              <div className="grid gap-2 sm:grid-cols-2">
-                <button
-                  className="btn-secondary"
-                  onClick={() => loadMatch(joinMatchId.trim())}
-                  disabled={!joinMatchId || pending !== null || recoveringMatch}
-                >
-                  {pending === "load" ? <span className="inline-flex items-center gap-2"><Spinner /> Loading...</span> : "Load Match"}
-                </button>
-
-                {inviteUrl && (
+              <div className="flex flex-wrap gap-2">
+                {inviteUrl ? (
                   <button
-                    className="btn-ghost"
+                    className="btn-ghost text-xs"
                     onClick={async () => {
                       await navigator.clipboard.writeText(inviteUrl);
                       toast.success("Invite link copied");
                     }}
                   >
-                    Copy Invite Link
+                    Copy Room Link
                   </button>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs text-gray-400">Deposit Monster</label>
-                <select
-                  className="input"
-                  value={joinMonsterId}
-                  onChange={(e) => setJoinMonsterId(e.target.value)}
-                  disabled={userHasDeposited || pending !== null || recoveringMatch}
+                ) : null}
+                <button
+                  className="btn-ghost text-xs"
+                  disabled={!currentMatchId || pending !== null || recoveringMatch}
+                  onClick={() => loadMatch(currentMatchId)}
                 >
-                  <option value="">Select monster</option>
-                  {(walletMonsters.data ?? []).map((m) => (
-                    <option value={m.objectId} key={m.objectId}>
-                      {m.name} ({short(m.objectId)})
-                    </option>
-                  ))}
-                </select>
+                  {pending === "load" ? "Syncing..." : "Refresh"}
+                </button>
+                <button
+                  className="btn-ghost text-xs"
+                  onClick={onResetArenaFlow}
+                  disabled={pending !== null || recoveringMatch}
+                >
+                  Back To Lobby
+                </button>
               </div>
-
-              <div className="space-y-2">
-                <label className="text-xs text-gray-400">Optional Matching Stake (SUI)</label>
-                <input
-                  className="input"
-                  placeholder="0.0"
-                  value={joinStake}
-                  onChange={(e) => setJoinStake(e.target.value)}
-                  disabled={userHasDeposited || pending !== null || recoveringMatch}
-                />
-              </div>
-
-              <button
-                className="btn-primary w-full"
-                onClick={onJoinMatch}
-                disabled={!account || !joinMatchId || pending !== null || recoveringMatch || userHasDeposited}
-              >
-                {pending === "join"
-                  ? <span className="inline-flex items-center gap-2"><Spinner /> Sending...</span>
-                  : userHasDeposited
-                    ? "Deposited"
-                    : "Send To Arena"}
-              </button>
-
-              {userHasDeposited && !bothDeposited && (
-                <p className="text-xs text-yellow-300">
-                  Waiting for opponent.
-                </p>
-              )}
-
-              {userHasDeposited && bothDeposited && (
-                <p className="text-xs text-green-300">
-                  Both legends are deposited. You can start battle.
-                </p>
-              )}
-
-              <button
-                className="btn-secondary w-full"
-                onClick={onStartBattle}
-                disabled={!canStartBattle || pending !== null || recoveringMatch}
-              >
-                {pending === "battle" ? <span className="inline-flex items-center gap-2"><Spinner /> Resolving...</span> : "Start Battle"}
-              </button>
-
-              <p className="text-xs text-gray-400">
-                Spectator mode: anyone can load a match by ID and watch status + final outcome.
-              </p>
-
-              {lockCreateActions && (
-                <p className="text-xs text-cyan">
-                  Active match lock is on to avoid mistakes. Use Back To Lobby if you need to switch matches.
-                </p>
-              )}
             </div>
-          </div>
 
-          <div className="glass-card space-y-4 p-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold">Battle Board</h3>
-              <button
-                className="btn-ghost"
-                disabled={!currentMatchId || pending !== null || recoveringMatch}
-                onClick={() => loadMatch(currentMatchId)}
-              >
-                Refresh
-              </button>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-[22px] border border-white/10 bg-black/20 p-4">
+                <div className="text-[11px] uppercase tracking-[0.24em] text-gray-400">Room</div>
+                <div className="mt-2 text-lg font-bold text-white">{roomStatusLabel}</div>
+                <div className="mt-1 text-xs text-gray-400">
+                  {currentMatchId ? `Match ${short(currentMatchId)}` : "No room loaded yet"}
+                </div>
+              </div>
+              <div className="rounded-[22px] border border-cyan/25 bg-cyan/10 p-4">
+                <div className="text-[11px] uppercase tracking-[0.24em] text-cyan/80">You</div>
+                <div className="mt-2 text-lg font-bold text-white">{userHasDeposited ? "Ready" : "Not ready"}</div>
+                <div className="mt-1 text-xs text-gray-300">
+                  {userHasDeposited ? "Your legend and wager are locked in." : "Deposit to show Ready."}
+                </div>
+              </div>
+              <div className="rounded-[22px] border border-purple/25 bg-purple/10 p-4">
+                <div className="text-[11px] uppercase tracking-[0.24em] text-purple-100">Opponent</div>
+                <div className="mt-2 text-lg font-bold text-white">{opponentHasDeposited ? "Ready" : "Waiting"}</div>
+                <div className="mt-1 text-xs text-gray-300">
+                  {opponentHasDeposited ? "Their legend is in the room." : "They still need to deposit."}
+                </div>
+              </div>
             </div>
 
             {recoveringMatch ? (
@@ -992,45 +909,47 @@ export function ArenaPage() {
                   }
                 />
 
-                <div className="grid gap-2 sm:grid-cols-4">
+                <div className="grid gap-3 sm:grid-cols-3">
                   <button
-                    className="btn-primary min-h-12"
+                    className="btn-primary min-h-14 text-base"
                     onClick={onJoinMatch}
                     disabled={!account || !joinMatchId || pending !== null || recoveringMatch || userHasDeposited}
                   >
                     {pending === "join"
-                      ? <span className="inline-flex items-center gap-2"><Spinner /> Sending...</span>
+                      ? <span className="inline-flex items-center gap-2"><Spinner /> Readying...</span>
                       : userHasDeposited
-                        ? "Deposited"
-                        : "Send To Arena"}
+                        ? "Legend Ready"
+                        : "Ready Up Legend"}
                   </button>
                   <button
-                    className="btn-secondary min-h-12"
+                    className="btn-secondary min-h-14 text-base"
                     onClick={onStartBattle}
                     disabled={!canStartBattle || pending !== null || recoveringMatch}
                   >
                     {pending === "battle" ? <span className="inline-flex items-center gap-2"><Spinner /> Resolving...</span> : "Start Battle"}
                   </button>
                   <button
-                    className="btn-ghost min-h-12"
+                    className="btn-ghost min-h-14 text-base"
                     onClick={onWithdraw}
                     disabled={!canWithdraw || pending !== null || recoveringMatch}
                   >
-                    {pending === "withdraw" ? <span className="inline-flex items-center gap-2"><Spinner /> Withdrawing...</span> : "Withdraw"}
-                  </button>
-                  <button className="btn-ghost min-h-12" disabled>
-                    Place Bet
+                    {pending === "withdraw" ? <span className="inline-flex items-center gap-2"><Spinner /> Leaving...</span> : "Withdraw & Leave"}
                   </button>
                 </div>
 
-                <p className="text-xs text-gray-400">
-                  If your opponent goes offline before both legends are deposited, use Withdraw to reclaim your monster and stake.
-                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-[22px] border border-white/10 bg-black/20 p-4 text-sm text-gray-300">
+                    Wager is locked at the moment you ready up. If your opponent disappears before the room locks, use Withdraw & Leave.
+                  </div>
+                  <div className="rounded-[22px] border border-white/10 bg-black/20 p-4 text-sm text-gray-300">
+                    Anyone can load the room by ID to spectate. Battles settle on-chain and feed the leaderboard.
+                  </div>
+                </div>
               </div>
             )}
 
             {resolution && (
-              <div className="rounded-xl border border-cyan/40 bg-cyan/10 p-4 text-sm">
+              <div className="rounded-[24px] border border-cyan/40 bg-cyan/10 p-4 text-sm">
                 <div className="mb-2 text-xs uppercase tracking-wide text-cyan-200">Battle Result</div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div>
@@ -1063,6 +982,153 @@ export function ArenaPage() {
               </div>
             )}
           </div>
+
+          <details className="glass-card overflow-hidden p-4 sm:p-5">
+            <summary className="cursor-pointer list-none">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.26em] text-gray-400">Advanced</div>
+                  <div className="mt-1 text-xl font-bold text-white">Manual Match Tools</div>
+                  <div className="mt-1 text-sm text-gray-400">
+                    Use this if you want to type a wallet address or paste a room ID manually.
+                  </div>
+                </div>
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-gray-200">
+                  Open Panel
+                </span>
+              </div>
+            </summary>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
+                <h2 className="text-lg font-bold">Create Match</h2>
+                {lockCreateActions ? (
+                  <div className="mt-3 rounded-xl border border-yellow-400/40 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
+                    You are already in an active match. Finish it or go Back To Lobby before creating a new one.
+                  </div>
+                ) : null}
+                <div className="mt-4 space-y-3">
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400">Opponent Address</label>
+                    <input
+                      className="input"
+                      placeholder="0x..."
+                      value={opponent}
+                      onChange={(e) => setOpponent(e.target.value)}
+                      disabled={lockCreateActions || pending !== null || recoveringMatch}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400">Your Monster</label>
+                    <select
+                      className="input"
+                      value={createMonsterId}
+                      onChange={(e) => setCreateMonsterId(e.target.value)}
+                      disabled={lockCreateActions || pending !== null || recoveringMatch}
+                    >
+                      <option value="">Select monster</option>
+                      {(walletMonsters.data ?? []).map((m) => (
+                        <option value={m.objectId} key={m.objectId}>
+                          {m.name} ({short(m.objectId)})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400">Optional Stake (SUI)</label>
+                    <input
+                      className="input"
+                      placeholder="0.0"
+                      value={createStake}
+                      onChange={(e) => setCreateStake(e.target.value)}
+                      disabled={lockCreateActions || pending !== null || recoveringMatch}
+                    />
+                  </div>
+
+                  <button
+                    className="btn-primary min-h-12 w-full"
+                    onClick={onCreateMatch}
+                    disabled={!account || pending !== null || recoveringMatch || lockCreateActions}
+                  >
+                    {pending === "create" ? <span className="inline-flex items-center gap-2"><Spinner /> Creating...</span> : "Create Room + Ready Up"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
+                <h2 className="text-lg font-bold">Join / Spectate Match</h2>
+                {recoveringMatch && (
+                  <div className="mt-3 rounded-xl border border-cyan/35 bg-cyan/10 px-3 py-2 text-xs text-cyan">
+                    <span className="inline-flex items-center gap-2"><Spinner /> Recovering active arena match from blockchain...</span>
+                  </div>
+                )}
+                <div className="mt-4 space-y-3">
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400">ArenaMatch Object ID</label>
+                    <input
+                      className="input"
+                      placeholder="0x..."
+                      value={joinMatchId}
+                      onChange={(e) => setJoinMatchId(e.target.value)}
+                      disabled={lockCreateActions || pending !== null || recoveringMatch}
+                    />
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <button
+                      className="btn-secondary min-h-12"
+                      onClick={() => loadMatch(joinMatchId.trim())}
+                      disabled={!joinMatchId || pending !== null || recoveringMatch}
+                    >
+                      {pending === "load" ? <span className="inline-flex items-center gap-2"><Spinner /> Loading...</span> : "Load Match"}
+                    </button>
+
+                    {inviteUrl ? (
+                      <button
+                        className="btn-ghost min-h-12"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(inviteUrl);
+                          toast.success("Invite link copied");
+                        }}
+                      >
+                        Copy Invite Link
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400">Deposit Monster</label>
+                    <select
+                      className="input"
+                      value={joinMonsterId}
+                      onChange={(e) => setJoinMonsterId(e.target.value)}
+                      disabled={userHasDeposited || pending !== null || recoveringMatch}
+                    >
+                      <option value="">Select monster</option>
+                      {(walletMonsters.data ?? []).map((m) => (
+                        <option value={m.objectId} key={m.objectId}>
+                          {m.name} ({short(m.objectId)})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs text-gray-400">Matching Stake (SUI)</label>
+                    <input
+                      className="input"
+                      placeholder="0.0"
+                      value={joinStake}
+                      onChange={(e) => setJoinStake(e.target.value)}
+                      disabled={userHasDeposited || pending !== null || recoveringMatch}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </details>
 
           <div className="glass-card space-y-3 p-4">
             <div className="flex items-center justify-between gap-2">
@@ -1149,24 +1215,41 @@ export function ArenaPage() {
             )}
           </div>
         </div>
-
-        <ArenaLobby
-          selfAddress={account?.address}
-          connectionState={lobby.connectionState}
-          isConnected={lobby.isConnected}
-          endpoint={lobby.endpoint}
-          lastError={lobby.lastError}
-          players={lobby.players}
-          openMatches={lobby.openMatches}
-          invites={lobby.invites}
-          recentMatches={lobby.recentMatches}
-          busy={pending !== null || recoveringMatch || lockCreateActions}
-          onInvite={onInvitePlayer}
-          onCreateOpenMatch={onCreateOpenLobbyMatch}
-          onJoinOpenMatch={onJoinOpenLobbyMatch}
-          onAcceptInvite={onAcceptLobbyInvite}
-        />
       </div>
+
+      {(currentMatchId || activeMatch) && (
+        <div className="safe-bottom fixed inset-x-3 bottom-3 z-40 md:hidden">
+          <div className="glass-card border-purple/30 bg-black/80 p-3 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+            <div className="mb-2 flex items-center justify-between gap-2 text-[11px] uppercase tracking-[0.24em]">
+              <span className="text-cyan/80">Ready Room Actions</span>
+              <span className="text-gray-400">{roomStatusLabel}</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                className="btn-primary min-h-12 text-sm"
+                onClick={onJoinMatch}
+                disabled={!account || !joinMatchId || pending !== null || recoveringMatch || userHasDeposited}
+              >
+                {userHasDeposited ? "Ready" : "Ready Up"}
+              </button>
+              <button
+                className="btn-secondary min-h-12 text-sm"
+                onClick={onStartBattle}
+                disabled={!canStartBattle || pending !== null || recoveringMatch}
+              >
+                Battle
+              </button>
+              <button
+                className="btn-ghost min-h-12 text-sm"
+                onClick={onWithdraw}
+                disabled={!canWithdraw || pending !== null || recoveringMatch}
+              >
+                Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </PageShell>
   );
 }

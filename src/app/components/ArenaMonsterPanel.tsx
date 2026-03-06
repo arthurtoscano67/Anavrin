@@ -24,7 +24,7 @@ export function ArenaMonsterPanel({
 }) {
   if (!monster) {
     return (
-      <div className="arena-monster-card flex min-h-[320px] flex-col justify-between rounded-[28px] border border-dashed border-borderSoft bg-black/25 p-4">
+      <div className="arena-monster-card flex min-h-[250px] flex-col justify-between rounded-[28px] border border-dashed border-borderSoft bg-black/25 p-4 sm:min-h-[320px]">
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-xs uppercase tracking-[0.22em] text-gray-400">{side === "left" ? "Player A" : "Player B"}</div>
@@ -36,8 +36,9 @@ export function ArenaMonsterPanel({
         </div>
 
         <div className="grid place-items-center py-6">
-          <div className="flex h-36 w-36 items-center justify-center rounded-full border border-white/10 bg-white/5 text-center text-sm text-gray-400">
-            Legend not deposited
+          <div className="flex h-28 w-28 flex-col items-center justify-center rounded-full border border-white/10 bg-white/5 px-4 text-center text-sm text-gray-400 sm:h-36 sm:w-36">
+            <span className="text-2xl">🫧</span>
+            <span className="mt-2">Legend not deposited</span>
           </div>
         </div>
 
@@ -75,7 +76,7 @@ export function ArenaMonsterPanel({
           <div className="arena-creature-glow" />
           <MonsterImage
             objectId={monster.objectId}
-            className={`relative z-10 mx-auto aspect-square h-44 w-44 border border-white/10 bg-black/40 ${side === "right" ? "scale-x-[-1]" : ""}`}
+            className={`relative z-10 mx-auto aspect-square h-32 w-32 border border-white/10 bg-black/40 sm:h-44 sm:w-44 ${side === "right" ? "scale-x-[-1]" : ""}`}
           />
           <div className="arena-blink" />
         </div>
@@ -117,7 +118,12 @@ export function ArenaMonsterPanel({
           </div>
 
           <div className="rounded-2xl border border-white/8 bg-white/5 px-3 py-3 text-sm text-gray-200">
-            Stake {stakeLabel} SUI
+            <div className="flex items-center justify-between gap-3">
+              <span>Stake {stakeLabel} SUI</span>
+              <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${isReady ? "bg-green-500/15 text-green-200" : "bg-yellow-500/15 text-yellow-100"}`}>
+                {isReady ? "Wager locked" : "Waiting"}
+              </span>
+            </div>
           </div>
         </div>
       </div>
