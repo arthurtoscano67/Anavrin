@@ -45,7 +45,7 @@ body {
 }
 
 .glass-card {
-  @apply bg-surface border border-borderSoft rounded-2xl shadow-card;
+  @apply min-w-0 bg-surface border border-borderSoft rounded-2xl shadow-card;
 }
 
 .card-hover {
@@ -66,6 +66,8 @@ body {
 
 .input {
   @apply w-full rounded-xl bg-black/30 border border-borderSoft px-3 py-2 text-base md:text-sm text-white outline-none transition focus:border-purple;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .nav-link {

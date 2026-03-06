@@ -22,7 +22,7 @@ export function BattleArena({
   if (!match) {
     return (
       <div className="arena-stage overflow-hidden rounded-[32px] border border-borderSoft p-5">
-        <div className="relative z-10 mx-auto flex min-h-[400px] max-w-3xl flex-col items-center justify-center text-center">
+        <div className="relative z-10 mx-auto flex min-h-[320px] max-w-3xl flex-col items-center justify-center text-center sm:min-h-[400px]">
           <div className="rounded-full border border-cyan/30 bg-cyan/10 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-cyan/80">
             Ready Room
           </div>
@@ -34,21 +34,21 @@ export function BattleArena({
             Then either trainer can start the battle.
           </p>
 
-          <div className="mt-8 grid w-full gap-3 sm:grid-cols-3">
-            <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
-              <div className="text-3xl">1</div>
-              <div className="mt-2 text-sm font-bold text-white">Invite</div>
-              <div className="mt-1 text-xs text-gray-400">Tap a trainer in the lobby.</div>
+          <div className="mt-8 grid w-full grid-cols-3 gap-2 sm:gap-3">
+            <div className="rounded-[22px] border border-white/10 bg-black/20 p-3 sm:rounded-[24px] sm:p-4">
+              <div className="text-2xl sm:text-3xl">1</div>
+              <div className="mt-2 text-xs font-bold uppercase tracking-[0.16em] text-white sm:text-sm sm:normal-case sm:tracking-normal">Invite</div>
+              <div className="mt-1 text-[11px] leading-4 text-gray-400 sm:text-xs sm:leading-5">Tap a trainer in the lobby.</div>
             </div>
-            <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
-              <div className="text-3xl">2</div>
-              <div className="mt-2 text-sm font-bold text-white">Ready Up</div>
-              <div className="mt-1 text-xs text-gray-400">Both trainers deposit legend + wager.</div>
+            <div className="rounded-[22px] border border-white/10 bg-black/20 p-3 sm:rounded-[24px] sm:p-4">
+              <div className="text-2xl sm:text-3xl">2</div>
+              <div className="mt-2 text-xs font-bold uppercase tracking-[0.16em] text-white sm:text-sm sm:normal-case sm:tracking-normal">Ready Up</div>
+              <div className="mt-1 text-[11px] leading-4 text-gray-400 sm:text-xs sm:leading-5">Both trainers deposit legend + wager.</div>
             </div>
-            <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
-              <div className="text-3xl">3</div>
-              <div className="mt-2 text-sm font-bold text-white">Battle</div>
-              <div className="mt-1 text-xs text-gray-400">Either trainer can press Start Battle.</div>
+            <div className="rounded-[22px] border border-white/10 bg-black/20 p-3 sm:rounded-[24px] sm:p-4">
+              <div className="text-2xl sm:text-3xl">3</div>
+              <div className="mt-2 text-xs font-bold uppercase tracking-[0.16em] text-white sm:text-sm sm:normal-case sm:tracking-normal">Battle</div>
+              <div className="mt-1 text-[11px] leading-4 text-gray-400 sm:text-xs sm:leading-5">Either trainer can press Start Battle.</div>
             </div>
           </div>
         </div>

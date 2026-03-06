@@ -27,6 +27,7 @@ import { useAnavrinData } from "../hooks/useAnavrinData";
 import { useTxExecutor } from "../hooks/useTxExecutor";
 
 const ACTIVE_ARENA_MATCH_STORAGE_KEY = "activeArenaMatch";
+type MobileArenaSection = "lobby" | "flow" | "room" | "live" | "history";
 
 function includesPlayer(match: ArenaMatch, address?: string | null): boolean {
   if (!address) return false;
@@ -68,7 +69,9 @@ export function ArenaPage() {
   const [pending, setPending] = useState<string | null>(null);
   const [handledLobbyStartId, setHandledLobbyStartId] = useState<string | null>(null);
   const [recoveringMatch, setRecoveringMatch] = useState(false);
+  const [mobileSection, setMobileSection] = useState<MobileArenaSection>("lobby");
   const lobbySectionRef = useRef<HTMLDivElement | null>(null);
+  const flowSectionRef = useRef<HTMLDivElement | null>(null);
   const roomSectionRef = useRef<HTMLDivElement | null>(null);
   const liveSectionRef = useRef<HTMLDivElement | null>(null);
   const historySectionRef = useRef<HTMLDivElement | null>(null);
@@ -589,6 +592,13 @@ export function ArenaPage() {
     account &&
     (account.address === pendingMatchStart.from || account.address === pendingMatchStart.to)
   );
+  useEffect(() => {
+    if (awaitingRoomCreation || activeMatch || currentMatchId) {
+      setMobileSection("room");
+      return;
+    }
+    setMobileSection((current) => (current === "room" ? "lobby" : current));
+  }, [activeMatch, awaitingRoomCreation, currentMatchId]);
   const incomingInviteCount = lobby.invites.filter(
     (invite) => invite.to === account?.address && invite.status === "pending"
   ).length;
@@ -649,10 +659,11 @@ export function ArenaPage() {
           : "Invite A Trainer";
   const mobileSectionButtons = [
     { id: "lobby", label: "Lobby", ref: lobbySectionRef },
+    { id: "flow", label: "Flow", ref: flowSectionRef },
     { id: "room", label: "Room", ref: roomSectionRef },
     { id: "live", label: "Live", ref: liveSectionRef },
     { id: "history", label: "History", ref: historySectionRef },
-  ];
+  ] satisfies Array<{ id: MobileArenaSection; label: string; ref: RefObject<HTMLDivElement | null> }>;
 
   const yourNextAction = useMemo(() => {
     if (!account) return "Connect wallet to start.";
@@ -774,6 +785,10 @@ export function ArenaPage() {
       },
     ];
   }, [activeMatch, awaitingRoomCreation, bothDeposited, canStartBattle, incomingInviteCount, opponent, userHasDeposited]);
+  const currentCoachStep =
+    coachSteps.find((step) => step.current) ??
+    coachSteps.find((step) => !step.done) ??
+    coachSteps[coachSteps.length - 1];
 
   return (
     <PageShell
@@ -784,8 +799,12 @@ export function ArenaPage() {
         {mobileSectionButtons.map((section) => (
           <button
             key={section.id}
-            className="btn-ghost min-h-11 shrink-0 rounded-full px-4 text-sm"
-            onClick={() => scrollToSection(section.ref)}
+            className={`min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold transition ${
+              mobileSection === section.id
+                ? "border-purple/50 bg-purple/25 text-white"
+                : "border-borderSoft bg-black/20 text-gray-300"
+            }`}
+            onClick={() => setMobileSection(section.id)}
           >
             {section.label}
           </button>
@@ -793,7 +812,10 @@ export function ArenaPage() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.1fr_0.95fr] xl:items-start">
-        <div className="order-1 xl:order-2" ref={lobbySectionRef}>
+        <div
+          className={`${mobileSection === "lobby" ? "block" : "hidden"} order-1 min-w-0 md:block xl:order-2`}
+          ref={lobbySectionRef}
+        >
           <ArenaLobby
             selfAddress={account?.address}
             connectionState={lobby.connectionState}
@@ -812,8 +834,13 @@ export function ArenaPage() {
           />
         </div>
 
-        <div className="order-2 space-y-4 pb-24 md:pb-0 xl:order-1">
-          <div className="glass-card overflow-hidden border-purple/35 bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.28),transparent_42%),linear-gradient(135deg,rgba(17,24,39,0.92),rgba(11,18,32,0.96))] p-4 sm:p-5">
+        <div
+          className={`${mobileSection === "lobby" ? "hidden" : "block"} order-2 min-w-0 space-y-4 pb-24 md:block md:pb-0 xl:order-1`}
+        >
+          <div
+            className={`${mobileSection === "flow" ? "block" : "hidden"} glass-card overflow-hidden border-purple/35 bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.28),transparent_42%),linear-gradient(135deg,rgba(17,24,39,0.92),rgba(11,18,32,0.96))] p-4 md:block sm:p-5`}
+            ref={flowSectionRef}
+          >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.28em] text-cyan/75">Arena Flow</div>
@@ -826,6 +853,17 @@ export function ArenaPage() {
               </div>
               <div className="rounded-full border border-cyan/40 bg-cyan/15 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan">
                 {roomStatusLabel}
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-[22px] border border-cyan/30 bg-cyan/10 p-4 md:hidden">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan/80">Next step</div>
+              <div className="mt-2 flex items-start gap-3">
+                <div className="text-2xl">{currentCoachStep.icon}</div>
+                <div className="min-w-0">
+                  <div className="text-base font-bold text-white">{currentCoachStep.title}</div>
+                  <p className="mt-1 text-sm leading-6 text-gray-200">{currentCoachStep.help}</p>
+                </div>
               </div>
             </div>
 
@@ -881,14 +919,17 @@ export function ArenaPage() {
                 </button>
                 <button
                   className="btn-ghost min-h-14 text-base"
-                  onClick={() => scrollToSection(lobbySectionRef)}
+                  onClick={() => {
+                    setMobileSection("lobby");
+                    scrollToSection(lobbySectionRef);
+                  }}
                 >
                   Browse Lobby
                 </button>
               </div>
             </div>
 
-            <div className="no-scrollbar mt-4 flex gap-3 overflow-x-auto pb-1">
+            <div className="no-scrollbar mt-4 hidden gap-3 overflow-x-auto pb-1 md:flex">
               {coachSteps.map((step) => (
                 <div
                   key={step.id}
@@ -924,7 +965,7 @@ export function ArenaPage() {
               </div>
             </div>
 
-            <details className="mt-4 rounded-[22px] border border-white/10 bg-black/20 px-4 py-3 text-sm text-gray-300">
+            <details className="mt-4 hidden rounded-[22px] border border-white/10 bg-black/20 px-4 py-3 text-sm text-gray-300 md:block">
               <summary className="cursor-pointer font-semibold text-white">
                 Tap for simple instructions
               </summary>
@@ -937,7 +978,10 @@ export function ArenaPage() {
             </details>
           </div>
 
-          <div className="glass-card space-y-4 p-4 sm:p-5" ref={roomSectionRef}>
+          <div
+            className={`${mobileSection === "room" ? "block" : "hidden"} glass-card space-y-4 p-4 md:block sm:p-5`}
+            ref={roomSectionRef}
+          >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.26em] text-cyan/80">Ready Room</div>
@@ -1097,7 +1141,7 @@ export function ArenaPage() {
             )}
           </div>
 
-          <details className="glass-card overflow-hidden p-4 sm:p-5">
+          <details className={`${mobileSection === "flow" ? "block" : "hidden"} glass-card overflow-hidden p-4 md:block sm:p-5`}>
             <summary className="cursor-pointer list-none">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -1244,7 +1288,10 @@ export function ArenaPage() {
             </div>
           </details>
 
-          <div className="glass-card space-y-3 p-4" ref={liveSectionRef}>
+          <div
+            className={`${mobileSection === "live" ? "block" : "hidden"} glass-card space-y-3 p-4 md:block`}
+            ref={liveSectionRef}
+          >
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-lg font-bold">Live Battles</h3>
               <span className="rounded-full border border-cyan/35 bg-cyan/10 px-3 py-1 text-xs font-semibold text-cyan">
@@ -1287,7 +1334,10 @@ export function ArenaPage() {
             )}
           </div>
 
-          <div className="glass-card space-y-3 p-4" ref={historySectionRef}>
+          <div
+            className={`${mobileSection === "history" ? "block" : "hidden"} glass-card space-y-3 p-4 md:block`}
+            ref={historySectionRef}
+          >
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-lg font-bold">Recent Fights</h3>
               <Link to="/leaderboard" className="btn-ghost text-xs">
