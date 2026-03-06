@@ -1,15 +1,15 @@
-import { powerPreview, short } from "../lib/format";
-import type { ArenaMonsterSnapshot } from "../lib/types";
-import { MonsterImage } from "./MonsterImage";
-import { StageBadge } from "./StageBadge";
-import { StatBar } from "./StatBar";
+import { powerPreview, short } from '../../lib/format';
+import type { ArenaMonsterSnapshot } from '../../lib/types';
+import { MonsterImage } from '../../components/MonsterImage';
+import { StageBadge } from '../../components/StageBadge';
+import { StatBar } from '../../components/StatBar';
 
 function healthMeter(monster: ArenaMonsterSnapshot): number {
   const base = 45 + monster.stage * 10 + monster.wins * 2 - monster.losses;
   return Math.max(18, Math.min(100, base));
 }
 
-export function ArenaMonsterPanel({
+export function ArenaMonsterCard({
   monster,
   side,
   playerLabel,
@@ -17,7 +17,7 @@ export function ArenaMonsterPanel({
   stakeLabel,
 }: {
   monster?: ArenaMonsterSnapshot | null;
-  side: "left" | "right";
+  side: 'left' | 'right';
   playerLabel: string;
   isReady: boolean;
   stakeLabel: string;
@@ -27,7 +27,7 @@ export function ArenaMonsterPanel({
       <div className="arena-monster-card flex min-h-[250px] flex-col justify-between rounded-[28px] border border-dashed border-borderSoft bg-black/25 p-4 sm:min-h-[320px]">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-xs uppercase tracking-[0.22em] text-gray-400">{side === "left" ? "Player A" : "Player B"}</div>
+            <div className="text-xs uppercase tracking-[0.22em] text-gray-400">{side === 'left' ? 'Player A' : 'Player B'}</div>
             <div className="mt-1 text-lg font-bold text-white">{playerLabel}</div>
           </div>
           <span className="rounded-full border border-yellow-400/35 bg-yellow-500/10 px-3 py-1 text-xs font-semibold text-yellow-200">
@@ -59,25 +59,25 @@ export function ArenaMonsterPanel({
   const hp = healthMeter(monster);
 
   return (
-    <div className={`arena-monster-card rounded-[28px] border p-4 ${isReady ? "border-cyan/40 bg-black/35 shadow-[0_0_28px_rgba(6,182,212,0.16)]" : "border-borderSoft bg-black/25"}`}>
+    <div className={`arena-monster-card rounded-[28px] border p-4 ${isReady ? 'border-cyan/40 bg-black/35 shadow-[0_0_28px_rgba(6,182,212,0.16)]' : 'border-borderSoft bg-black/25'}`}>
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-xs uppercase tracking-[0.22em] text-gray-400">{side === "left" ? "Player A" : "Player B"}</div>
+          <div className="text-xs uppercase tracking-[0.22em] text-gray-400">{side === 'left' ? 'Player A' : 'Player B'}</div>
           <div className="mt-1 text-lg font-bold text-white">{playerLabel}</div>
           <div className="mt-1 text-xs text-gray-400">{short(monster.objectId)}</div>
         </div>
-        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${isReady ? "border border-green-400/35 bg-green-500/10 text-green-200" : "border border-yellow-400/35 bg-yellow-500/10 text-yellow-200"}`}>
-          {isReady ? "Ready" : "Waiting"}
+        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${isReady ? 'border border-green-400/35 bg-green-500/10 text-green-200' : 'border border-yellow-400/35 bg-yellow-500/10 text-yellow-200'}`}>
+          {isReady ? 'Ready' : 'Waiting'}
         </span>
       </div>
 
       <div className="mt-4 grid gap-4">
-        <div className={`arena-creature-frame ${side === "left" ? "arena-idle-left" : "arena-idle-right"}`}>
+        <div className={`arena-creature-frame ${side === 'left' ? 'arena-idle-left' : 'arena-idle-right'}`}>
           <div className="arena-creature-glow" />
           <MonsterImage
             objectId={monster.objectId}
             monster={monster}
-            className={`relative z-10 mx-auto aspect-square h-32 w-32 border border-white/10 bg-black/40 sm:h-44 sm:w-44 ${side === "right" ? "scale-x-[-1]" : ""}`}
+            className={`relative z-10 mx-auto aspect-square h-32 w-32 border border-white/10 bg-black/40 sm:h-44 sm:w-44 ${side === 'right' ? 'scale-x-[-1]' : ''}`}
           />
           <div className="arena-blink" />
         </div>
@@ -121,8 +121,8 @@ export function ArenaMonsterPanel({
           <div className="rounded-2xl border border-white/8 bg-white/5 px-3 py-3 text-sm text-gray-200">
             <div className="flex items-center justify-between gap-3">
               <span>Stake {stakeLabel} SUI</span>
-              <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${isReady ? "bg-green-500/15 text-green-200" : "bg-yellow-500/15 text-yellow-100"}`}>
-                {isReady ? "Wager locked" : "Waiting"}
+              <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${isReady ? 'bg-green-500/15 text-green-200' : 'bg-yellow-500/15 text-yellow-100'}`}>
+                {isReady ? 'Wager locked' : 'Waiting'}
               </span>
             </div>
           </div>

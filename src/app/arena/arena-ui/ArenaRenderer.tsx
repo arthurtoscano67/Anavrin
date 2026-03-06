@@ -1,8 +1,8 @@
-import { statusLabel, toSui } from "../lib/format";
-import type { ArenaMatch } from "../lib/types";
-import { ArenaMonsterPanel } from "./ArenaMonsterPanel";
+import { statusLabel, toSui } from '../../lib/format';
+import type { ArenaMatch } from '../../lib/types';
+import { ArenaMonsterCard } from './ArenaMonsterCard';
 
-export function BattleArena({
+export function ArenaRenderer({
   match,
   playerALabel,
   playerBLabel,
@@ -17,7 +17,7 @@ export function BattleArena({
   onRefresh?: () => void;
   refreshing?: boolean;
   isResolving?: boolean;
-  winnerSide?: "left" | "right" | null;
+  winnerSide?: 'left' | 'right' | null;
 }) {
   if (!match) {
     return (
@@ -41,13 +41,13 @@ export function BattleArena({
             </div>
             <div className="rounded-[22px] border border-white/10 bg-black/20 p-3 sm:rounded-[24px] sm:p-4">
               <div className="text-2xl sm:text-3xl">2</div>
-              <div className="mt-2 text-xs font-bold uppercase tracking-[0.16em] text-white sm:text-sm sm:normal-case sm:tracking-normal">Ready Up</div>
-              <div className="mt-1 text-[11px] leading-4 text-gray-400 sm:text-xs sm:leading-5">Both trainers deposit legend + wager.</div>
+              <div className="mt-2 text-xs font-bold uppercase tracking-[0.16em] text-white sm:text-sm sm:normal-case sm:tracking-normal">Ready</div>
+              <div className="mt-1 text-[11px] leading-4 text-gray-400 sm:text-xs sm:leading-5">Both trainers send legends.</div>
             </div>
             <div className="rounded-[22px] border border-white/10 bg-black/20 p-3 sm:rounded-[24px] sm:p-4">
               <div className="text-2xl sm:text-3xl">3</div>
               <div className="mt-2 text-xs font-bold uppercase tracking-[0.16em] text-white sm:text-sm sm:normal-case sm:tracking-normal">Battle</div>
-              <div className="mt-1 text-[11px] leading-4 text-gray-400 sm:text-xs sm:leading-5">Either trainer can press Start Battle.</div>
+              <div className="mt-1 text-[11px] leading-4 text-gray-400 sm:text-xs sm:leading-5">Either trainer can start.</div>
             </div>
           </div>
         </div>
@@ -55,31 +55,31 @@ export function BattleArena({
     );
   }
 
-  const totalStake = Number(match.stake_a || "0") + Number(match.stake_b || "0");
-  const monsterAName = match.monster_a_data?.name ?? "Awaiting Legend";
-  const monsterBName = match.monster_b_data?.name ?? "Awaiting Legend";
+  const totalStake = Number(match.stake_a || '0') + Number(match.stake_b || '0');
+  const monsterAName = match.monster_a_data?.name ?? 'Awaiting Legend';
+  const monsterBName = match.monster_b_data?.name ?? 'Awaiting Legend';
   const isReadyRoom = !match.mon_a || !match.mon_b;
   const headline = !match.mon_a && !match.mon_b
-    ? "Ready Room Open"
+    ? 'Ready Room Open'
     : !match.mon_b
       ? `${monsterAName} is ready`
       : !match.mon_a
         ? `${monsterBName} is ready`
         : `${monsterAName} vs ${monsterBName}`;
   const helperText = match.status === 2
-    ? "Battle finished. Winner is below."
+    ? 'Battle finished. Winner is below.'
     : match.status === 3
-      ? "Cancelled. Everyone got their legend back."
+      ? 'Cancelled. Everyone got their legend back.'
       : isReadyRoom
-        ? "Send a legend to light up your side."
-        : "Both sides are ready. Anyone can press battle.";
+        ? 'Send a legend to light up your side.'
+        : 'Both sides are ready. Anyone can press battle.';
 
   return (
     <section className="arena-stage overflow-hidden rounded-[32px] border border-purple/30 p-4 md:p-6">
       <div className="relative z-10 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-[11px] uppercase tracking-[0.26em] text-cyan/80">
-            {isReadyRoom ? "Ready Room" : "Battle Arena"}
+            {isReadyRoom ? 'Ready Room' : 'Battle Arena'}
           </div>
           <h2 className="mt-2 text-2xl font-black tracking-tight text-white md:text-3xl">
             {headline}
@@ -96,7 +96,7 @@ export function BattleArena({
 
         {onRefresh ? (
           <button className="btn-ghost text-xs" onClick={onRefresh} disabled={refreshing}>
-            {refreshing ? "Syncing..." : "Refresh"}
+            {refreshing ? 'Syncing...' : 'Refresh'}
           </button>
         ) : null}
       </div>
@@ -106,8 +106,8 @@ export function BattleArena({
       {isResolving ? <div className="arena-impact-flash" /> : null}
 
       <div className="relative z-10 mt-6 grid gap-4 md:grid-cols-[1fr_110px_1fr] md:items-center">
-        <div className={`${isResolving ? "arena-attack-left" : ""} ${winnerSide === "left" ? "arena-winner" : ""}`}>
-          <ArenaMonsterPanel
+        <div className={`${isResolving ? 'arena-attack-left' : ''} ${winnerSide === 'left' ? 'arena-winner' : ''}`}>
+          <ArenaMonsterCard
             monster={match.monster_a_data}
             playerLabel={playerALabel}
             side="left"
@@ -122,8 +122,8 @@ export function BattleArena({
           </div>
         </div>
 
-        <div className={`${isResolving ? "arena-recoil-right" : ""} ${winnerSide === "right" ? "arena-winner" : ""}`}>
-          <ArenaMonsterPanel
+        <div className={`${isResolving ? 'arena-recoil-right' : ''} ${winnerSide === 'right' ? 'arena-winner' : ''}`}>
+          <ArenaMonsterCard
             monster={match.monster_b_data}
             playerLabel={playerBLabel}
             side="right"
