@@ -1,4 +1,4 @@
-# Anavrin Monsters Web
+# Anavrin Legends Web
 
 Production-ready Next.js + TypeScript website for the Anavrin NFT monster battle game on Sui.
 
@@ -21,6 +21,7 @@ Production-ready Next.js + TypeScript website for the Anavrin NFT monster battle
   - battle invites
   - spectator mode feed
   - on-chain battle controls (`create_match`, `deposit_monster`, `deposit_stake`, `start_battle`)
+- Legacy React entrypoint (`src/anavrin/App.jsx`) includes a dedicated `Arena` tab powered by `src/anavrin/ArenaLobby.jsx`
 - My Monsters:
   - mint
   - sync evolution

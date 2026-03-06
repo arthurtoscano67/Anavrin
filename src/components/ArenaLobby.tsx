@@ -58,6 +58,11 @@ export function ArenaLobby({
   onAcceptInvite,
 }: ArenaLobbyProps) {
   const [stakeInput, setStakeInput] = useState("");
+  const statusOpen = isConnected || connectionState === "connecting";
+  const statusLabel = statusOpen ? "OPEN" : "CLOSED";
+  const criticalConfigError = Boolean(
+    lastError && lastError.includes("serving the site HTML")
+  );
 
   const incomingInvites = useMemo(
     () => invites.filter((invite) => invite.to === selfAddress && invite.status === "pending"),
@@ -83,12 +88,12 @@ export function ArenaLobby({
     <aside className="glass-card space-y-4 p-4 lg:sticky lg:top-24">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold">Arena Lobby</h3>
-        <span className={`text-xs font-semibold uppercase tracking-wide ${connectionTone(connectionState)}`}>
-          {connectionState}
+        <span className={`text-xs font-semibold uppercase tracking-wide ${statusOpen ? "text-green-300" : connectionTone(connectionState)}`}>
+          {statusLabel}
         </span>
       </div>
 
-      {!isConnected && (
+      {criticalConfigError && (
         <div className="rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-xs text-red-200">
           <div className="font-semibold">Lobby disconnected</div>
           {lastError ? <div className="mt-1 text-red-100/90">{lastError}</div> : null}

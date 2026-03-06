@@ -6,6 +6,7 @@ import {
   useSuiClient,
 } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
+import ArenaLobby from "./ArenaLobby.jsx";
 
 const PACKAGE_ID = "0x51abc7016876cd23efcd5a5240bc03ef0e3ed4538e0d87a029944d45cb3e4b81";
 const TREASURY_ID = "0x414bd328952f9ddfde568e0a256476a0e2e148b21b606892f07ea3dd4360baeb";
@@ -91,7 +92,7 @@ function NftImage({ id }) {
       {!loaded && <span className="placeholder">💗</span>}
       <img
         src={src}
-        alt="Anavrin Monster"
+        alt="Anavrin Legends NFT"
         onLoad={() => setLoaded(true)}
         style={{ display: loaded ? "block" : "none" }}
       />
@@ -409,18 +410,41 @@ export default function App() {
     }
   };
 
+  const handleCreateArenaMatch = useCallback(
+    async (opponentAddress) => {
+      if (!account?.address) {
+        throw new Error("Connect wallet first.");
+      }
+      if (!opponentAddress || !/^0x[0-9a-fA-F]{2,}$/.test(opponentAddress.trim())) {
+        throw new Error("Invalid opponent wallet address.");
+      }
+
+      await runTx(
+        (tx) => {
+          tx.moveCall({
+            target: `${PACKAGE_ID}::monster::create_match`,
+            arguments: [tx.pure.address(opponentAddress.trim()), tx.object(CLOCK_ID)],
+          });
+        },
+        `On-chain arena match created vs ${shortAddr(opponentAddress)}.`
+      );
+    },
+    [account?.address, runTx]
+  );
+
   return (
     <>
       <style>{CSS}</style>
       <div className="app">
         <header className="header">
           <div className="brand">
-            💗 Anavrin <small>mainnet</small>
+            💗 Anavrin Legends <small>mainnet</small>
           </div>
           <div className="tabs">
             {[
               ["mint", "Mint"],
               ["nfts", "My NFTs"],
+              ["arena", "Arena"],
               ["admin", "Admin"],
             ].map(([id, label]) => (
               <button
@@ -684,6 +708,23 @@ export default function App() {
                     </button>
                   </div>
                 </div>
+              )}
+            </>
+          )}
+
+          {tab === "arena" && (
+            <>
+              {!account ? (
+                <ConnectGate
+                  title="Connect wallet for Arena"
+                  subtitle="See online players and send real-time battle challenges."
+                />
+              ) : (
+                <ArenaLobby
+                  account={account}
+                  monsters={myNfts}
+                  onCreateMatch={handleCreateArenaMatch}
+                />
               )}
             </>
           )}

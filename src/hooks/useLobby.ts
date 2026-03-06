@@ -232,11 +232,12 @@ export function useLobby(options: UseLobbyOptions): UseLobbyResult {
       );
 
   const wsRef = useRef<WebSocket | null>(null);
-    const reconnectTimerRef = useRef<number | undefined>(undefined);
-    const pingTimerRef = useRef<number | undefined>(undefined);
-    const reconnectAttemptRef = useRef(0);
-    const shouldReconnectRef = useRef(true);
-    const blockedEndpointRef = useRef<string | null>(null);
+  const reconnectTimerRef = useRef<number | undefined>(undefined);
+  const pingTimerRef = useRef<number | undefined>(undefined);
+  const reconnectAttemptRef = useRef(0);
+  const shouldReconnectRef = useRef(true);
+  const blockedEndpointRef = useRef<string | null>(null);
+  const hasConnectedRef = useRef(false);
 
   const [connectionState, setConnectionState] =
         useState<LobbyConnectionState>("idle");
@@ -320,15 +321,16 @@ export function useLobby(options: UseLobbyOptions): UseLobbyResult {
                                   const ws = new WebSocket(endpoint);
         wsRef.current = ws;
 
-                                  ws.onopen = () => {
-                                          reconnectAttemptRef.current = 0;
-                                          setConnectionState("open");
-                                          sendJoin();
-                                          clearPingTimer();
-                                          pingTimerRef.current = window.setInterval(() => {
-                                                    sendRaw({ type: "ping" });
-                                          }, PING_INTERVAL_MS);
-                                  };
+    ws.onopen = () => {
+      reconnectAttemptRef.current = 0;
+      hasConnectedRef.current = true;
+      setConnectionState("open");
+      sendJoin();
+      clearPingTimer();
+      pingTimerRef.current = window.setInterval(() => {
+        sendRaw({ type: "ping" });
+      }, PING_INTERVAL_MS);
+    };
 
                                   ws.onmessage = (event) => {
                                           if (typeof event.data !== "string") return;
@@ -379,27 +381,23 @@ export function useLobby(options: UseLobbyOptions): UseLobbyResult {
                                           setLastError("Lobby connection error");
                                   };
 
-                                  ws.onclose = () => {
-                                          if (wsRef.current === ws) {
-                                                    wsRef.current = null;
-                                          }
-                                          clearPingTimer();
-                                          setConnectionState("closed");
-                                          if (!lastError) {
-                                                    setLastError(`Lobby socket closed (${endpoint})`);
-                                          }
-                                          scheduleReconnect(connect);
-                                  };
-  }, [
-        address,
-        clearPingTimer,
-        enabled,
-        endpoint,
-        lastError,
-        scheduleReconnect,
-        sendJoin,
-        sendRaw,
-      ]);
+    ws.onclose = () => {
+      if (wsRef.current === ws) {
+        wsRef.current = null;
+      }
+      clearPingTimer();
+      const shouldRetry = shouldReconnectRef.current && enabled && Boolean(address) && Boolean(endpoint);
+      if (shouldRetry && hasConnectedRef.current) {
+        setConnectionState("connecting");
+      } else {
+        setConnectionState("closed");
+      }
+      if (!lastError && !shouldRetry) {
+        setLastError(`Lobby socket closed (${endpoint})`);
+      }
+      scheduleReconnect(connect);
+    };
+  }, [address, clearPingTimer, enabled, endpoint, lastError, scheduleReconnect, sendJoin, sendRaw]);
 
   useEffect(() => {
         shouldReconnectRef.current = true;

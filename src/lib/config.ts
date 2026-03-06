@@ -1,6 +1,6 @@
-export const APP_NAME = "Anavrin Monsters";
+export const APP_NAME = "Anavrin Legends";
 export const APP_DESCRIPTION =
-  "Monster NFT battle arena on Sui with wallet + kiosk inventory, breeding, and live PvP coordination.";
+  "Anavrin Legends NFT battle arena on Sui with wallet + kiosk inventory, breeding, and live PvP coordination.";
 
 export const SUI_NETWORK =
   (process.env.NEXT_PUBLIC_SUI_NETWORK as "mainnet" | "testnet" | "devnet") ||
