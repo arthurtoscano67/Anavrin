@@ -174,6 +174,9 @@ function resolveEndpoint(explicit?: string): string {
   if (fromEnv) return normalizeEndpoint(fromEnv);
 
   if (typeof window === "undefined") return "";
+  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    return "ws://127.0.0.1:8787/lobby";
+  }
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
   return `${protocol}://${window.location.host}/lobby`;
 }
