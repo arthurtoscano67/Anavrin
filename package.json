@@ -7,7 +7,7 @@
     "build": "vite build",
     "preview": "vite preview --port 5174",
     "lobby:deploy": "npx wrangler deploy",
-    "lobby:dev": "npx wrangler dev",
+    "lobby:dev": "npx wrangler dev --local --port 8787",
     "lobby:tail": "npx wrangler tail",
     "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings=0",
     "typecheck": "tsc --noEmit",

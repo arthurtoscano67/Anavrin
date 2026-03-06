@@ -62,6 +62,26 @@ Then add the Worker URL to your Cloudflare Pages project env:
 - Variable: `VITE_LOBBY_WS_URL`
 - Value: `wss://<your-worker>.workers.dev/lobby`
 
+Local development (2 terminals):
+
+1. Terminal A:
+
+```bash
+npm run lobby:dev
+```
+
+2. Terminal B:
+
+```bash
+npm run dev
+```
+
+3. Local env:
+
+```bash
+VITE_LOBBY_WS_URL=ws://127.0.0.1:8787/lobby
+```
+
 3. Run dev server:
 
 ```bash
