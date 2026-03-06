@@ -374,6 +374,20 @@ export function ArenaPage() {
     activeMatch.status === 1 &&
     account &&
     (account.address === activeMatch.player_a || account.address === activeMatch.player_b);
+  const userSide =
+    activeMatch && account
+      ? account.address === activeMatch.player_a
+        ? "a"
+        : account.address === activeMatch.player_b
+          ? "b"
+          : null
+      : null;
+  const userHasDeposited =
+    activeMatch && userSide
+      ? userSide === "a"
+        ? Boolean(activeMatch.mon_a)
+        : Boolean(activeMatch.mon_b)
+      : false;
   const isPlayerInMatch =
     activeMatch &&
     account &&
@@ -518,6 +532,7 @@ export function ArenaPage() {
                   className="input"
                   value={joinMonsterId}
                   onChange={(e) => setJoinMonsterId(e.target.value)}
+                  disabled={userHasDeposited || pending !== null}
                 >
                   <option value="">Select monster</option>
                   {(walletMonsters.data ?? []).map((m) => (
@@ -535,12 +550,27 @@ export function ArenaPage() {
                   placeholder="0.0"
                   value={joinStake}
                   onChange={(e) => setJoinStake(e.target.value)}
+                  disabled={userHasDeposited || pending !== null}
                 />
               </div>
 
-              <button className="btn-primary w-full" onClick={onJoinMatch} disabled={!account || !joinMatchId || pending !== null}>
-                {pending === "join" ? <span className="inline-flex items-center gap-2"><Spinner /> Sending...</span> : "Deposit To Match"}
+              <button
+                className="btn-primary w-full"
+                onClick={onJoinMatch}
+                disabled={!account || !joinMatchId || pending !== null || userHasDeposited}
+              >
+                {pending === "join"
+                  ? <span className="inline-flex items-center gap-2"><Spinner /> Sending...</span>
+                  : userHasDeposited
+                    ? "Legend Deposited"
+                    : "Deposit To Match"}
               </button>
+
+              {userHasDeposited && (
+                <p className="text-xs text-green-300">
+                  Your legend is already deposited. Waiting for opponent or battle start.
+                </p>
+              )}
 
               <button
                 className="btn-secondary w-full"

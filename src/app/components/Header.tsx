@@ -8,7 +8,7 @@ export function Header() {
   const account = useCurrentAccount();
 
   return (
-    <header className="sticky top-0 z-40 border-b border-borderSoft bg-background/90 backdrop-blur-xl">
+    <header className="safe-top sticky top-0 z-40 border-b border-borderSoft bg-background/90 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3">
           <div className="grid h-11 w-11 place-items-center rounded-xl border border-purple/40 bg-purple/20 text-xl">💗</div>
@@ -20,7 +20,7 @@ export function Header() {
           </div>
         </div>
 
-        <nav className="flex flex-wrap items-center gap-2">
+        <nav className="no-scrollbar flex w-full items-center gap-2 overflow-x-auto whitespace-nowrap pb-1 lg:w-auto lg:flex-wrap lg:overflow-visible">
           {ROUTES.map((r) => (
             <NavLink
               key={r.path}
@@ -33,7 +33,9 @@ export function Header() {
           ))}
         </nav>
 
-        <ConnectButton />
+        <div className="self-start lg:self-auto">
+          <ConnectButton />
+        </div>
       </div>
     </header>
   );
