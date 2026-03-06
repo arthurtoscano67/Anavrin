@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
-import { useNavigate } from "react-router-dom";
 
 import { LoadingGrid } from "../components/LoadingGrid";
 import { MonsterCard } from "../components/MonsterCard";
 import { PageShell } from "../components/PageShell";
 import { Spinner } from "../components/Spinner";
+import { useArenaMatches } from "../hooks/useArenaMatches";
 import { CLOCK_ID, MODULE, PACKAGE_ID } from "../lib/constants";
 import { toSui } from "../lib/format";
 import { useAnavrinData } from "../hooks/useAnavrinData";
@@ -14,8 +14,8 @@ import { useTxExecutor } from "../hooks/useTxExecutor";
 
 export function MyLegendsPage() {
   const account = useCurrentAccount();
-  const navigate = useNavigate();
   const { walletMonsters, kioskMonsters, kioskCaps, adults } = useAnavrinData();
+  const arenaMatches = useArenaMatches(account?.address);
   const { execute } = useTxExecutor();
 
   const [pendingMonsterId, setPendingMonsterId] = useState<string | null>(null);
@@ -25,7 +25,13 @@ export function MyLegendsPage() {
   const [listCap, setListCap] = useState("");
   const [listPrice, setListPrice] = useState("1");
 
-  const adultsById = useMemo(() => new Map(adults.map((m) => [m.objectId, m])), [adults]);
+  const depositedMonsterIds = useMemo(
+    () =>
+      new Set(
+        arenaMatches.activeMatches.flatMap((match) => [match.mon_a, match.mon_b].filter(Boolean) as string[])
+      ),
+    [arenaMatches.activeMatches]
+  );
 
   const onCreateKiosk = async () => {
     if (!account) return;
@@ -121,6 +127,8 @@ export function MyLegendsPage() {
               <MonsterCard
                 key={monster.objectId}
                 monster={monster}
+                arenaDisabled={depositedMonsterIds.has(monster.objectId)}
+                arenaLabel={depositedMonsterIds.has(monster.objectId) ? "Deposited" : "Send To Arena"}
                 actions={
                   <div className="grid gap-2">
                     <button
@@ -143,13 +151,6 @@ export function MyLegendsPage() {
 
                     <button className="btn-ghost w-full" onClick={() => setListTarget(monster.objectId)}>
                       List For Sale
-                    </button>
-
-                    <button
-                      className="btn-ghost w-full"
-                      onClick={() => navigate(`/arena?monster=${monster.objectId}`)}
-                    >
-                      Send To Arena
                     </button>
                   </div>
                 }

@@ -13,6 +13,7 @@ import {
 import type {
   ActivePlayer,
   ArenaMatch,
+  ArenaMonsterSnapshot,
   BattleOutcomeEvent,
   KioskCap,
   Listing,
@@ -51,6 +52,35 @@ function parseOptionMonsterId(value: unknown): string | null {
     if (typeof id.id === "string") return id.id;
   }
   return null;
+}
+
+function parseEmbeddedArenaMonster(value: unknown): ArenaMonsterSnapshot | null {
+  if (!value) return null;
+  const rec = asRecord(value);
+  const vec = rec.vec as unknown[] | undefined;
+  if (!Array.isArray(vec) || vec.length === 0) return null;
+
+  const first = asRecord(vec[0]);
+  const fields = asRecord(first.fields);
+  const idFields = asRecord(fields.id);
+  const objectId = String(idFields.id ?? "");
+  if (!objectId) return null;
+
+  return {
+    objectId,
+    name: String(fields.name ?? "Unknown"),
+    stage: Number(fields.stage ?? 0),
+    attack: Number(fields.attack ?? 0),
+    defense: Number(fields.defense ?? 0),
+    speed: Number(fields.speed ?? 0),
+    wins: Number(fields.wins ?? 0),
+    losses: Number(fields.losses ?? 0),
+    xp: Number(fields.xp ?? 0),
+    scars: Number(fields.scars ?? 0),
+    broken_horns: Number(fields.broken_horns ?? 0),
+    torn_wings: Number(fields.torn_wings ?? 0),
+    created_at: String(fields.created_at ?? "0"),
+  };
 }
 
 export function parseMonster(data: SuiObjectData, location: "wallet" | "kiosk", kioskId?: string, priceMist?: string): Monster | null {
@@ -226,22 +256,39 @@ export async function fetchArenaMatch(client: SuiClient, matchId: string): Promi
     mon_b: parseOptionMonsterId(f.mon_b),
     stake_a: String(asRecord(f.stake_a).value ?? "0"),
     stake_b: String(asRecord(f.stake_b).value ?? "0"),
+    monster_a_data: parseEmbeddedArenaMonster(f.mon_a),
+    monster_b_data: parseEmbeddedArenaMonster(f.mon_b),
   };
 }
 
-export async function fetchRecentMatches(client: SuiClient): Promise<ArenaMatch[]> {
-  const events = await queryAllEvents(client, `${PACKAGE_ID}::${MODULE}::MatchCreated`, 4, 50);
-  const ids = events
-    .map((e) => String(asRecord(e.parsedJson).match_id ?? ""))
-    .filter(Boolean)
-    .slice(0, 30);
+export async function fetchAllArenaMatches(client: SuiClient): Promise<ArenaMatch[]> {
+  const events = await queryAllEvents(client, `${PACKAGE_ID}::${MODULE}::MatchCreated`);
+  const ids = [...new Set(
+    events
+      .map((event) => String(asRecord(event.parsedJson).match_id ?? ""))
+      .filter(Boolean)
+  )];
 
-  const matches: ArenaMatch[] = [];
-  for (const id of ids) {
-    const match = await fetchArenaMatch(client, id);
-    if (match) matches.push(match);
-  }
-  return matches;
+  if (ids.length === 0) return [];
+
+  const matches = await Promise.all(
+    ids.map(async (id) => {
+      try {
+        return await fetchArenaMatch(client, id);
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  return matches
+    .filter((match): match is ArenaMatch => Boolean(match))
+    .sort((a, b) => Number(b.created_at) - Number(a.created_at));
+}
+
+export async function fetchRecentMatches(client: SuiClient): Promise<ArenaMatch[]> {
+  const matches = await fetchAllArenaMatches(client);
+  return matches.slice(0, 30);
 }
 
 export async function fetchActivePlayers(client: SuiClient): Promise<ActivePlayer[]> {

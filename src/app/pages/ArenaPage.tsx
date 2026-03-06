@@ -8,10 +8,11 @@ import { ArenaLobby } from "../../components/ArenaLobby";
 import type { LobbyInvite, LobbyOpenMatch } from "../../hooks/useLobby";
 import { useLobby } from "../../hooks/useLobby";
 
+import { BattleArena } from "../components/BattleArena";
 import { LoadingGrid } from "../components/LoadingGrid";
-import { MonsterImage } from "../components/MonsterImage";
 import { PageShell } from "../components/PageShell";
 import { Spinner } from "../components/Spinner";
+import { useArenaMatches } from "../hooks/useArenaMatches";
 import {
   ARENA_MATCH_TYPE,
   CLOCK_ID,
@@ -19,11 +20,28 @@ import {
   PACKAGE_ID,
   TREASURY_ID,
 } from "../lib/constants";
-import { short, stageMeta, statusLabel, toMist, toSui } from "../lib/format";
-import { fetchArenaMatch, fetchMatchResolution } from "../lib/sui";
+import { short, statusLabel, toMist, toSui } from "../lib/format";
+import { fetchArenaMatch, fetchMatchResolution, queryAllEvents } from "../lib/sui";
 import type { ArenaMatch, BattleOutcomeEvent, MatchResolution } from "../lib/types";
 import { useAnavrinData } from "../hooks/useAnavrinData";
 import { useTxExecutor } from "../hooks/useTxExecutor";
+
+const ACTIVE_ARENA_MATCH_STORAGE_KEY = "activeArenaMatch";
+
+function includesPlayer(match: ArenaMatch, address?: string | null): boolean {
+  if (!address) return false;
+  return match.player_a === address || match.player_b === address;
+}
+
+function preferMatch(matches: ArenaMatch[]): ArenaMatch | null {
+  if (matches.length === 0) return null;
+  const sorted = [...matches].sort((a, b) => Number(b.created_at) - Number(a.created_at));
+  const active = sorted.find((match) => match.status === 0 || match.status === 1);
+  if (active) return active;
+  const finished = sorted.find((match) => match.status === 2);
+  if (finished) return finished;
+  return sorted[0] ?? null;
+}
 
 function isValidSuiAddress(input: string): boolean {
   return /^0x[0-9a-fA-F]{2,}$/.test(input.trim());
@@ -34,6 +52,7 @@ export function ArenaPage() {
   const client = useSuiClient();
   const [params, setParams] = useSearchParams();
   const { walletMonsters, recentMatches } = useAnavrinData();
+  const arenaMatches = useArenaMatches(account?.address);
   const { execute, executeAndFetchBlock } = useTxExecutor();
 
   const [opponent, setOpponent] = useState("");
@@ -48,6 +67,7 @@ export function ArenaPage() {
   const [resolution, setResolution] = useState<MatchResolution | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [handledLobbyStartId, setHandledLobbyStartId] = useState<string | null>(null);
+  const [recoveringMatch, setRecoveringMatch] = useState(false);
 
   useEffect(() => {
     const m = params.get("match");
@@ -72,6 +92,7 @@ export function ArenaPage() {
   }, [joinMonsterId, walletMonsters.data]);
 
   const currentMatchId = joinMatchId.trim();
+  const urlMatchId = params.get("match")?.trim() ?? "";
 
   const selectedMonster = useMemo(
     () =>
@@ -89,6 +110,23 @@ export function ArenaPage() {
   const pendingMatchStart = lobby.pendingMatchStart;
   const clearPendingMatchStart = lobby.clearPendingMatchStart;
 
+  const setMatchContext = useCallback((match: ArenaMatch | null) => {
+    setActiveMatch(match);
+    if (!match || !account?.address) return;
+    if (!includesPlayer(match, account.address)) return;
+    const opponentAddress = match.player_a === account.address ? match.player_b : match.player_a;
+    if (opponentAddress) setOpponent(opponentAddress);
+  }, [account?.address]);
+
+  const persistActiveMatchId = useCallback((matchId?: string | null) => {
+    if (typeof window === "undefined") return;
+    if (matchId) {
+      window.localStorage.setItem(ACTIVE_ARENA_MATCH_STORAGE_KEY, matchId);
+      return;
+    }
+    window.localStorage.removeItem(ACTIVE_ARENA_MATCH_STORAGE_KEY);
+  }, []);
+
   const loadMatch = useCallback(async (matchId: string) => {
     if (!matchId) return;
     setPending("load");
@@ -97,16 +135,17 @@ export function ArenaPage() {
         fetchArenaMatch(client, matchId),
         fetchMatchResolution(client, matchId),
       ]);
-      setActiveMatch(match);
+      setMatchContext(match);
       setResolution(matchResolution);
+      persistActiveMatchId(match?.objectId ?? null);
     } catch (error) {
-      setActiveMatch(null);
+      setMatchContext(null);
       setResolution(null);
       toast.error(error instanceof Error ? error.message : "Unable to load match");
     } finally {
       setPending(null);
     }
-  }, [client]);
+  }, [client, persistActiveMatchId, setMatchContext]);
 
   const upsertMatchQueryParam = useCallback((matchId: string) => {
     setParams((prev) => {
@@ -115,6 +154,107 @@ export function ArenaPage() {
       return next;
     });
   }, [setParams]);
+
+  useEffect(() => {
+    if (!account?.address) {
+      setRecoveringMatch(false);
+      setMatchContext(null);
+      setResolution(null);
+      return;
+    }
+
+    let cancelled = false;
+    const recoverArenaState = async () => {
+      setRecoveringMatch(true);
+      try {
+        const address = account.address;
+        const byPriority = new Map<string, number>();
+        if (urlMatchId) byPriority.set(urlMatchId, Number.MAX_SAFE_INTEGER);
+
+        if (typeof window !== "undefined") {
+          const storedMatchId = window.localStorage
+            .getItem(ACTIVE_ARENA_MATCH_STORAGE_KEY)
+            ?.trim();
+          if (storedMatchId) {
+            byPriority.set(storedMatchId, Number.MAX_SAFE_INTEGER - 1);
+          }
+        }
+
+        const createdEvents = await queryAllEvents(
+          client,
+          `${PACKAGE_ID}::${MODULE}::MatchCreated`
+        );
+
+        for (const event of createdEvents) {
+          const parsed = event.parsedJson as Record<string, unknown> | null;
+          if (!parsed) continue;
+          const playerA = String(parsed.player_a ?? "");
+          const playerB = String(parsed.player_b ?? "");
+          if (playerA !== address && playerB !== address) continue;
+          const matchId = String(parsed.match_id ?? "");
+          if (!matchId) continue;
+          byPriority.set(matchId, Number(event.timestampMs ?? 0));
+        }
+
+        const candidateIds = [...byPriority.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .map(([id]) => id);
+
+        if (candidateIds.length === 0) {
+          if (!cancelled) {
+            setMatchContext(null);
+            setResolution(null);
+            persistActiveMatchId(null);
+          }
+          return;
+        }
+
+        const hydratedMatches = (await Promise.all(
+          candidateIds.map(async (id) => {
+            try {
+              return await fetchArenaMatch(client, id);
+            } catch {
+              return null;
+            }
+          })
+        ))
+          .filter((match): match is ArenaMatch => Boolean(match))
+          .filter((match) => includesPlayer(match, address));
+
+        const recovered = preferMatch(hydratedMatches);
+        if (!cancelled && recovered) {
+          setJoinMatchId(recovered.objectId);
+          upsertMatchQueryParam(recovered.objectId);
+          persistActiveMatchId(recovered.objectId);
+          setMatchContext(recovered);
+          const recoveredResolution = await fetchMatchResolution(client, recovered.objectId);
+          if (!cancelled) {
+            setResolution(recoveredResolution);
+          }
+          return;
+        }
+
+        if (!cancelled) {
+          setMatchContext(null);
+          setResolution(null);
+          persistActiveMatchId(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          toast.error(error instanceof Error ? error.message : "Failed to recover arena match");
+        }
+      } finally {
+        if (!cancelled) {
+          setRecoveringMatch(false);
+        }
+      }
+    };
+
+    void recoverArenaState();
+    return () => {
+      cancelled = true;
+    };
+  }, [account?.address, client, persistActiveMatchId, setMatchContext, upsertMatchQueryParam, urlMatchId]);
 
   useEffect(() => {
     if (!account?.address) return;
@@ -179,6 +319,7 @@ export function ArenaPage() {
       const createdMatchId = created.objectId;
       setJoinMatchId(createdMatchId);
       upsertMatchQueryParam(createdMatchId);
+      persistActiveMatchId(createdMatchId);
 
       const setupTx = new Transaction();
       setupTx.moveCall({
@@ -245,6 +386,7 @@ export function ArenaPage() {
 
       await execute(tx, "Match deposit complete");
       upsertMatchQueryParam(currentMatchId);
+      persistActiveMatchId(currentMatchId);
       await walletMonsters.refetch();
       await loadMatch(currentMatchId);
     } finally {
@@ -387,6 +529,7 @@ export function ArenaPage() {
     setResolution(null);
     setHandledLobbyStartId(null);
     clearPendingMatchStart();
+    persistActiveMatchId(null);
     setParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete("match");
@@ -487,25 +630,10 @@ export function ArenaPage() {
     return "Opponent is setting up now.";
   }, [activeMatch, awaitingRoomCreation, bothDeposited, opponent, opponentHasDeposited, userHasDeposited]);
 
-  const monsterMap = useMemo(
-    () => new Map((walletMonsters.data ?? []).map((monster) => [monster.objectId, monster])),
-    [walletMonsters.data]
+  const liveBattles = useMemo(
+    () => arenaMatches.activeMatches.filter((match) => match.objectId !== activeMatch?.objectId).slice(0, 8),
+    [activeMatch?.objectId, arenaMatches.activeMatches]
   );
-
-  const sideA = activeMatch
-    ? {
-        address: activeMatch.player_a,
-        monsterId: activeMatch.mon_a ?? undefined,
-        stake: activeMatch.stake_a,
-      }
-    : null;
-  const sideB = activeMatch
-    ? {
-        address: activeMatch.player_b,
-        monsterId: activeMatch.mon_b ?? undefined,
-        stake: activeMatch.stake_b,
-      }
-    : null;
 
   const localBattleFeed = useMemo(() => {
     const chainEvents = (recentMatches.data ?? []).slice(0, 6).map((match) => ({
@@ -653,7 +781,7 @@ export function ArenaPage() {
               <button
                 className="btn-ghost text-xs"
                 onClick={onResetArenaFlow}
-                disabled={pending !== null}
+                disabled={pending !== null || recoveringMatch}
               >
                 Back To Lobby
               </button>
@@ -675,7 +803,7 @@ export function ArenaPage() {
                   placeholder="0x..."
                   value={opponent}
                   onChange={(e) => setOpponent(e.target.value)}
-                  disabled={lockCreateActions || pending !== null}
+                  disabled={lockCreateActions || pending !== null || recoveringMatch}
                 />
               </div>
 
@@ -685,7 +813,7 @@ export function ArenaPage() {
                   className="input"
                   value={createMonsterId}
                   onChange={(e) => setCreateMonsterId(e.target.value)}
-                  disabled={lockCreateActions || pending !== null}
+                  disabled={lockCreateActions || pending !== null || recoveringMatch}
                 >
                   <option value="">Select monster</option>
                   {(walletMonsters.data ?? []).map((m) => (
@@ -703,14 +831,14 @@ export function ArenaPage() {
                   placeholder="0.0"
                   value={createStake}
                   onChange={(e) => setCreateStake(e.target.value)}
-                  disabled={lockCreateActions || pending !== null}
+                  disabled={lockCreateActions || pending !== null || recoveringMatch}
                 />
               </div>
 
               <button
                 className="btn-primary w-full"
                 onClick={onCreateMatch}
-                disabled={!account || pending !== null || lockCreateActions}
+                disabled={!account || pending !== null || recoveringMatch || lockCreateActions}
               >
                 {pending === "create" ? <span className="inline-flex items-center gap-2"><Spinner /> Creating...</span> : "Create & Send Invite"}
               </button>
@@ -718,6 +846,11 @@ export function ArenaPage() {
 
             <div className="glass-card space-y-4 p-4">
               <h2 className="text-lg font-bold">Join / Spectate Match</h2>
+              {recoveringMatch && (
+                <div className="rounded-xl border border-cyan/35 bg-cyan/10 px-3 py-2 text-xs text-cyan">
+                  <span className="inline-flex items-center gap-2"><Spinner /> Recovering active arena match from blockchain...</span>
+                </div>
+              )}
               <div className="space-y-2">
                 <label className="text-xs text-gray-400">ArenaMatch Object ID</label>
                 <input
@@ -725,7 +858,7 @@ export function ArenaPage() {
                   placeholder="0x..."
                   value={joinMatchId}
                   onChange={(e) => setJoinMatchId(e.target.value)}
-                  disabled={lockCreateActions || pending !== null}
+                  disabled={lockCreateActions || pending !== null || recoveringMatch}
                 />
               </div>
 
@@ -733,7 +866,7 @@ export function ArenaPage() {
                 <button
                   className="btn-secondary"
                   onClick={() => loadMatch(joinMatchId.trim())}
-                  disabled={!joinMatchId || pending !== null}
+                  disabled={!joinMatchId || pending !== null || recoveringMatch}
                 >
                   {pending === "load" ? <span className="inline-flex items-center gap-2"><Spinner /> Loading...</span> : "Load Match"}
                 </button>
@@ -757,7 +890,7 @@ export function ArenaPage() {
                   className="input"
                   value={joinMonsterId}
                   onChange={(e) => setJoinMonsterId(e.target.value)}
-                  disabled={userHasDeposited || pending !== null}
+                  disabled={userHasDeposited || pending !== null || recoveringMatch}
                 >
                   <option value="">Select monster</option>
                   {(walletMonsters.data ?? []).map((m) => (
@@ -775,32 +908,38 @@ export function ArenaPage() {
                   placeholder="0.0"
                   value={joinStake}
                   onChange={(e) => setJoinStake(e.target.value)}
-                  disabled={userHasDeposited || pending !== null}
+                  disabled={userHasDeposited || pending !== null || recoveringMatch}
                 />
               </div>
 
               <button
                 className="btn-primary w-full"
                 onClick={onJoinMatch}
-                disabled={!account || !joinMatchId || pending !== null || userHasDeposited}
+                disabled={!account || !joinMatchId || pending !== null || recoveringMatch || userHasDeposited}
               >
                 {pending === "join"
                   ? <span className="inline-flex items-center gap-2"><Spinner /> Sending...</span>
                   : userHasDeposited
-                    ? "Legend Deposited"
-                    : "Deposit To Match"}
+                    ? "Deposited"
+                    : "Send To Arena"}
               </button>
 
-              {userHasDeposited && (
+              {userHasDeposited && !bothDeposited && (
+                <p className="text-xs text-yellow-300">
+                  Waiting for opponent.
+                </p>
+              )}
+
+              {userHasDeposited && bothDeposited && (
                 <p className="text-xs text-green-300">
-                  Your legend is already deposited. Waiting for opponent or battle start.
+                  Both legends are deposited. You can start battle.
                 </p>
               )}
 
               <button
                 className="btn-secondary w-full"
                 onClick={onStartBattle}
-                disabled={!canStartBattle || pending !== null}
+                disabled={!canStartBattle || pending !== null || recoveringMatch}
               >
                 {pending === "battle" ? <span className="inline-flex items-center gap-2"><Spinner /> Resolving...</span> : "Start Battle"}
               </button>
@@ -822,105 +961,68 @@ export function ArenaPage() {
               <h3 className="text-lg font-bold">Battle Board</h3>
               <button
                 className="btn-ghost"
-                disabled={!currentMatchId || pending !== null}
+                disabled={!currentMatchId || pending !== null || recoveringMatch}
                 onClick={() => loadMatch(currentMatchId)}
               >
                 Refresh
               </button>
             </div>
 
-            {!activeMatch ? (
-              <div className="rounded-2xl border border-dashed border-borderSoft bg-black/20 px-4 py-8 text-center text-sm text-gray-300">
-                Load a match to populate both battle sides and show ready states.
+            {recoveringMatch ? (
+              <div className="rounded-2xl border border-cyan/30 bg-cyan/10 px-4 py-8 text-center text-sm text-cyan">
+                <span className="inline-flex items-center gap-2"><Spinner /> Syncing ArenaMatch from chain...</span>
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="rounded-3xl border border-purple/35 bg-gradient-to-br from-purple/20 via-surface to-cyan/10 p-4">
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm">
-                    <span className="rounded-full border border-purple/40 bg-purple/25 px-3 py-1 text-xs font-semibold text-purple-100">
-                      {statusLabel(activeMatch.status)}
-                    </span>
-                    <span className="text-xs text-gray-300">Match {short(activeMatch.objectId)}</span>
-                  </div>
+                <BattleArena
+                  match={activeMatch}
+                  playerALabel={activeMatch ? `${short(activeMatch.player_a)}${account?.address === activeMatch.player_a ? " • You" : ""}` : "Player A"}
+                  playerBLabel={activeMatch ? `${short(activeMatch.player_b)}${account?.address === activeMatch.player_b ? " • You" : ""}` : "Player B"}
+                  onRefresh={currentMatchId ? () => loadMatch(currentMatchId) : undefined}
+                  refreshing={pending === "load"}
+                  isResolving={pending === "battle"}
+                  winnerSide={
+                    resolution && activeMatch
+                      ? resolution.winner === activeMatch.player_a
+                        ? "left"
+                        : resolution.winner === activeMatch.player_b
+                          ? "right"
+                          : null
+                      : null
+                  }
+                />
 
-                  <div className="grid items-center gap-3 md:grid-cols-[1fr_auto_1fr]">
-                    {[sideA, sideB].map((side, index) => {
-                      if (!side) return null;
-                      const isYou = account?.address === side.address;
-                      const isReady = Boolean(side.monsterId);
-                      const knownMonster = side.monsterId ? monsterMap.get(side.monsterId) : undefined;
-                      const stage = knownMonster ? stageMeta(knownMonster.stage) : null;
-
-                      return (
-                        <div
-                          key={side.address}
-                          className={`rounded-2xl border p-4 ${
-                            isReady
-                              ? "border-cyan/40 bg-black/30 shadow-[0_0_20px_rgba(6,182,212,0.14)]"
-                              : "border-borderSoft bg-black/20"
-                          }`}
-                        >
-                          <div className="mb-2 flex items-center justify-between text-xs">
-                            <span className="font-semibold text-gray-200">
-                              {index === 0 ? "Left Side" : "Right Side"} {isYou ? "• You" : ""}
-                            </span>
-                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${isReady ? "bg-green-500/20 text-green-300" : "bg-yellow-500/20 text-yellow-300"}`}>
-                              {isReady ? "Ready" : "Waiting"}
-                            </span>
-                          </div>
-
-                          <div className="mb-2 font-semibold text-white">{short(side.address)}</div>
-                          {side.monsterId ? (
-                            <div className="grid gap-2">
-                              <MonsterImage objectId={side.monsterId} className="mx-auto aspect-square h-28 w-28 border border-borderSoft" />
-                              <div className="text-center text-sm font-semibold text-gray-100">
-                                {knownMonster?.name ?? `Legend ${short(side.monsterId)}`}
-                              </div>
-                              <div className="text-center text-xs text-cyan">Stake {toSui(side.stake)} SUI</div>
-                              {stage ? (
-                                <div className={`mx-auto rounded-full border px-2 py-0.5 text-[11px] font-semibold ${stage.color}`}>
-                                  {stage.emoji} {stage.label}
-                                </div>
-                              ) : null}
-                            </div>
-                          ) : (
-                            <div className="rounded-xl border border-dashed border-borderSoft bg-black/20 px-3 py-5 text-center text-xs text-gray-400">
-                              Legend not deposited yet
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-
-                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-legendGold/50 bg-legendGold/15 text-lg font-black text-legendGold">
-                      VS
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
+                <div className="grid gap-2 sm:grid-cols-4">
                   <button
-                    className="btn-secondary"
-                    onClick={onWithdraw}
-                    disabled={!canWithdraw || pending !== null}
+                    className="btn-primary min-h-12"
+                    onClick={onJoinMatch}
+                    disabled={!account || !joinMatchId || pending !== null || recoveringMatch || userHasDeposited}
                   >
-                    {pending === "withdraw" ? <span className="inline-flex items-center gap-2"><Spinner /> Withdrawing...</span> : "Withdraw (Before Lock)"}
+                    {pending === "join"
+                      ? <span className="inline-flex items-center gap-2"><Spinner /> Sending...</span>
+                      : userHasDeposited
+                        ? "Deposited"
+                        : "Send To Arena"}
                   </button>
                   <button
-                    className="btn-primary"
+                    className="btn-secondary min-h-12"
                     onClick={onStartBattle}
-                    disabled={!canStartBattle || pending !== null}
+                    disabled={!canStartBattle || pending !== null || recoveringMatch}
                   >
                     {pending === "battle" ? <span className="inline-flex items-center gap-2"><Spinner /> Resolving...</span> : "Start Battle"}
                   </button>
                   <button
-                    className="btn-ghost"
-                    onClick={onResetArenaFlow}
-                    disabled={pending !== null}
+                    className="btn-ghost min-h-12"
+                    onClick={onWithdraw}
+                    disabled={!canWithdraw || pending !== null || recoveringMatch}
                   >
-                    Back To Lobby
+                    {pending === "withdraw" ? <span className="inline-flex items-center gap-2"><Spinner /> Withdrawing...</span> : "Withdraw"}
+                  </button>
+                  <button className="btn-ghost min-h-12" disabled>
+                    Place Bet
                   </button>
                 </div>
+
                 <p className="text-xs text-gray-400">
                   If your opponent goes offline before both legends are deposited, use Withdraw to reclaim your monster and stake.
                 </p>
@@ -958,6 +1060,49 @@ export function ArenaPage() {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+          </div>
+
+          <div className="glass-card space-y-3 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-lg font-bold">Live Battles</h3>
+              <span className="rounded-full border border-cyan/35 bg-cyan/10 px-3 py-1 text-xs font-semibold text-cyan">
+                {liveBattles.length} live
+              </span>
+            </div>
+            {arenaMatches.isLoading ? (
+              <LoadingGrid count={2} />
+            ) : liveBattles.length === 0 ? (
+              <div className="text-sm text-gray-400">No live battles to watch right now.</div>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2">
+                {liveBattles.map((match) => (
+                  <button
+                    key={match.objectId}
+                    className="w-full rounded-[24px] border border-borderSoft bg-black/20 p-4 text-left transition hover:border-cyan/40 hover:bg-cyan/10"
+                    onClick={() => {
+                      setJoinMatchId(match.objectId);
+                      upsertMatchQueryParam(match.objectId);
+                      void loadMatch(match.objectId);
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-bold text-white">
+                        {match.monster_a_data?.name ?? short(match.player_a)} vs {match.monster_b_data?.name ?? short(match.player_b)}
+                      </div>
+                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-gray-200">
+                        {statusLabel(match.status)}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-xs text-gray-400">
+                      Stake {toSui(Number(match.stake_a) + Number(match.stake_b))} SUI
+                    </div>
+                    <div className="mt-4">
+                      <span className="btn-secondary text-xs">Watch Battle</span>
+                    </div>
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -1015,7 +1160,7 @@ export function ArenaPage() {
           openMatches={lobby.openMatches}
           invites={lobby.invites}
           recentMatches={lobby.recentMatches}
-          busy={pending !== null || lockCreateActions}
+          busy={pending !== null || recoveringMatch || lockCreateActions}
           onInvite={onInvitePlayer}
           onCreateOpenMatch={onCreateOpenLobbyMatch}
           onJoinOpenMatch={onJoinOpenLobbyMatch}

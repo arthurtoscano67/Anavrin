@@ -37,6 +37,22 @@ export type KioskCap = {
 
 export type ArenaStatus = 0 | 1 | 2 | 3;
 
+export type ArenaMonsterSnapshot = {
+  objectId: string;
+  name: string;
+  stage: number;
+  attack: number;
+  defense: number;
+  speed: number;
+  wins: number;
+  losses: number;
+  xp: number;
+  scars: number;
+  broken_horns: number;
+  torn_wings: number;
+  created_at: string;
+};
+
 export type ArenaMatch = {
   objectId: string;
   player_a: string;
@@ -47,6 +63,8 @@ export type ArenaMatch = {
   mon_b?: string | null;
   stake_a: string;
   stake_b: string;
+  monster_a_data?: ArenaMonsterSnapshot | null;
+  monster_b_data?: ArenaMonsterSnapshot | null;
 };
 
 export type BattleOutcomeEvent = {

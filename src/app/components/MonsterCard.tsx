@@ -9,9 +9,13 @@ import { StatBar } from "./StatBar";
 export function MonsterCard({
   monster,
   actions,
+  arenaDisabled = false,
+  arenaLabel = "Send To Arena",
 }: {
   monster: Monster;
   actions?: React.ReactNode;
+  arenaDisabled?: boolean;
+  arenaLabel?: string;
 }) {
   const winRate = monster.wins + monster.losses === 0 ? 0 : Math.round((monster.wins / (monster.wins + monster.losses)) * 100);
   const xpPct = Math.min(100, (monster.xp / 300) * 100);
@@ -53,12 +57,18 @@ export function MonsterCard({
 
         {actions}
 
-        <Link
-          to={`/arena?monster=${monster.objectId}`}
-          className="btn-ghost w-full text-center text-xs"
-        >
-          Send To Arena
-        </Link>
+        {arenaDisabled ? (
+          <button className="btn-ghost w-full text-center text-xs" disabled>
+            {arenaLabel}
+          </button>
+        ) : (
+          <Link
+            to={`/arena?monster=${monster.objectId}`}
+            className="btn-ghost w-full text-center text-xs"
+          >
+            {arenaLabel}
+          </Link>
+        )}
       </div>
     </article>
   );
