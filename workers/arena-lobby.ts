@@ -41,6 +41,25 @@ export type StartedMatch = {
   startedAt: number;
 };
 
+export type RoomParticipant = {
+  address: string;
+  joinedAt: number;
+  lastSeen: number;
+  present: boolean;
+  monsterId?: string;
+  monsterName?: string;
+  stage?: number;
+  stakeSui?: string;
+  ready: boolean;
+};
+
+export type RoomNotice = {
+  id: string;
+  summary: string;
+  timestamp: number;
+  tone: "info" | "warn" | "success";
+};
+
 type JoinMessage = {
   type: "join";
   address: string;
@@ -78,6 +97,36 @@ type MatchStartedMessage = {
   matchId?: string;
 };
 
+type JoinRoomMessage = {
+  type: "joinRoom";
+  address: string;
+};
+
+type LeaveRoomMessage = {
+  type: "leaveRoom";
+  address: string;
+};
+
+type RoomSelectMessage = {
+  type: "roomSelect";
+  address: string;
+  monsterId?: string;
+  monsterName?: string;
+  stage?: number;
+};
+
+type RoomStakeMessage = {
+  type: "roomStake";
+  address: string;
+  stakeSui: string;
+};
+
+type RoomReadyMessage = {
+  type: "roomReady";
+  address: string;
+  ready: boolean;
+};
+
 type PingMessage = {
   type: "ping";
 };
@@ -88,14 +137,27 @@ type ClientMessage =
   | InviteMessage
   | MatchCreatedMessage
   | MatchStartedMessage
+  | JoinRoomMessage
+  | LeaveRoomMessage
+  | RoomSelectMessage
+  | RoomStakeMessage
+  | RoomReadyMessage
   | PingMessage;
 
 type Session = {
   address?: string;
 };
 
+type StoredRoomState = {
+  participants: RoomParticipant[];
+  notices: RoomNotice[];
+  createdAt: number;
+};
+
 const MAX_RECENT_MATCHES = 20;
 const MAX_INVITES = 200;
+const MAX_ROOM_NOTICES = 18;
+const ROOM_STATE_KEY = "roomState";
 
 function toJson(data: unknown): string {
   return JSON.stringify(data);
@@ -129,8 +191,19 @@ export class ArenaLobby {
   private invites = new Map<string, LobbyInvite>();
   private recentMatches: RecentMatch[] = [];
 
+  private roomSessions = new Map<WebSocket, Session>();
+  private roomParticipants = new Map<string, RoomParticipant>();
+  private roomNotices: RoomNotice[] = [];
+  private roomCreatedAt = Date.now();
+
   constructor(private readonly state: DurableObjectState) {
-    void this.state;
+    this.state.blockConcurrencyWhile(async () => {
+      const stored = await this.state.storage.get<StoredRoomState>(ROOM_STATE_KEY);
+      if (!stored) return;
+      this.roomCreatedAt = stored.createdAt || Date.now();
+      this.roomNotices = stored.notices || [];
+      this.roomParticipants = new Map((stored.participants || []).map((participant) => [participant.address, participant]));
+    });
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -138,9 +211,15 @@ export class ArenaLobby {
       return new Response("Expected websocket upgrade", { status: 426 });
     }
 
+    const url = new URL(request.url);
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
-    this.acceptSession(server);
+
+    if (url.pathname.startsWith("/room/")) {
+      this.acceptRoomSession(server);
+    } else {
+      this.acceptLobbySession(server);
+    }
 
     return new Response(null, {
       status: 101,
@@ -148,26 +227,45 @@ export class ArenaLobby {
     });
   }
 
-  private acceptSession(socket: WebSocket) {
+  private acceptLobbySession(socket: WebSocket) {
     socket.accept();
     this.sessions.set(socket, {});
 
     socket.addEventListener("message", (event) => {
-      this.onMessage(socket, event.data);
+      this.onLobbyMessage(socket, event.data);
     });
 
     socket.addEventListener("close", () => {
-      this.onDisconnect(socket);
+      this.onLobbyDisconnect(socket);
     });
 
     socket.addEventListener("error", () => {
-      this.onDisconnect(socket);
+      this.onLobbyDisconnect(socket);
     });
 
     this.sendLobbyState(socket);
   }
 
-  private onMessage(socket: WebSocket, raw: unknown) {
+  private acceptRoomSession(socket: WebSocket) {
+    socket.accept();
+    this.roomSessions.set(socket, {});
+
+    socket.addEventListener("message", (event) => {
+      this.onRoomMessage(socket, event.data);
+    });
+
+    socket.addEventListener("close", () => {
+      this.onRoomDisconnect(socket);
+    });
+
+    socket.addEventListener("error", () => {
+      this.onRoomDisconnect(socket);
+    });
+
+    this.sendRoomState(socket);
+  }
+
+  private onLobbyMessage(socket: WebSocket, raw: unknown) {
     if (typeof raw !== "string") return;
 
     const message = safeParseJson(raw);
@@ -193,15 +291,49 @@ export class ArenaLobby {
         this.handleMatchStarted(socket, message);
         return;
       case "ping":
-        this.touchSession(socket);
+        this.touchLobbySession(socket);
         this.send(socket, { type: "pong", timestamp: Date.now() });
         return;
       default:
-        this.send(socket, { type: "error", message: "Unsupported message type" });
+        this.send(socket, { type: "error", message: "Unsupported lobby message type" });
     }
   }
 
-  private onDisconnect(socket: WebSocket) {
+  private onRoomMessage(socket: WebSocket, raw: unknown) {
+    if (typeof raw !== "string") return;
+
+    const message = safeParseJson(raw);
+    if (!message) {
+      this.send(socket, { type: "error", message: "Invalid JSON message" });
+      return;
+    }
+
+    switch (message.type) {
+      case "joinRoom":
+        this.handleJoinRoom(socket, message);
+        return;
+      case "leaveRoom":
+        this.handleLeaveRoom(socket, message);
+        return;
+      case "roomSelect":
+        this.handleRoomSelect(socket, message);
+        return;
+      case "roomStake":
+        this.handleRoomStake(socket, message);
+        return;
+      case "roomReady":
+        this.handleRoomReady(socket, message);
+        return;
+      case "ping":
+        this.touchRoomSession(socket);
+        this.send(socket, { type: "pong", timestamp: Date.now() });
+        return;
+      default:
+        this.send(socket, { type: "error", message: "Unsupported room message type" });
+    }
+  }
+
+  private onLobbyDisconnect(socket: WebSocket) {
     const session = this.sessions.get(socket);
     this.sessions.delete(socket);
 
@@ -210,11 +342,34 @@ export class ArenaLobby {
     }
 
     const address = session.address;
-    if (!this.hasActiveSessionForAddress(address)) {
+    if (!this.hasActiveLobbySessionForAddress(address)) {
       this.removeAddressState(address);
     }
 
     this.broadcastLobbyState();
+  }
+
+  private onRoomDisconnect(socket: WebSocket) {
+    const session = this.roomSessions.get(socket);
+    this.roomSessions.delete(socket);
+
+    if (!session?.address) {
+      return;
+    }
+
+    const address = session.address;
+    if (!this.hasActiveRoomSessionForAddress(address)) {
+      const participant = this.roomParticipants.get(address);
+      if (participant) {
+        participant.present = false;
+        participant.ready = false;
+        participant.lastSeen = Date.now();
+        this.pushRoomNotice(`${short(address)} left the room.`, "warn");
+        this.persistRoomState();
+      }
+    }
+
+    this.broadcastRoomState();
   }
 
   private handleJoin(socket: WebSocket, message: JoinMessage) {
@@ -241,7 +396,7 @@ export class ArenaLobby {
     session.address = message.address;
     this.sessions.set(socket, session);
 
-    if (previousAddress && previousAddress !== message.address && !this.hasActiveSessionForAddress(previousAddress)) {
+    if (previousAddress && previousAddress !== message.address && !this.hasActiveLobbySessionForAddress(previousAddress)) {
       this.removeAddressState(previousAddress);
     }
 
@@ -254,7 +409,7 @@ export class ArenaLobby {
     if (!address) return;
 
     this.sessions.delete(socket);
-    if (!this.hasActiveSessionForAddress(address)) {
+    if (!this.hasActiveLobbySessionForAddress(address)) {
       this.removeAddressState(address);
     }
 
@@ -267,11 +422,7 @@ export class ArenaLobby {
   }
 
   private handleInvite(socket: WebSocket, message: InviteMessage) {
-    if (!isAddress(message.from) || !isAddress(message.to)) {
-      return;
-    }
-
-    if (message.from === message.to) {
+    if (!isAddress(message.from) || !isAddress(message.to) || message.from === message.to) {
       return;
     }
 
@@ -300,8 +451,7 @@ export class ArenaLobby {
     this.invites.set(invite.id, invite);
 
     if (this.invites.size > MAX_INVITES) {
-      const oldestId = [...this.invites.values()]
-        .sort((a, b) => a.createdAt - b.createdAt)[0]?.id;
+      const oldestId = [...this.invites.values()].sort((a, b) => a.createdAt - b.createdAt)[0]?.id;
       if (oldestId) this.invites.delete(oldestId);
     }
 
@@ -351,9 +501,7 @@ export class ArenaLobby {
         this.sendToAddress(started.from, { type: "matchStarted", match: started });
         this.sendToAddress(started.to, { type: "matchStarted", match: started });
       }
-      this.pushRecent(
-        `On-chain match created: ${short(message.creator)} vs ${short(message.opponent!)}`
-      );
+      this.pushRecent(`On-chain match created: ${short(message.creator)} vs ${short(message.opponent || "")}`);
     }
 
     this.broadcastLobbyState();
@@ -400,7 +548,133 @@ export class ArenaLobby {
     this.broadcastLobbyState();
   }
 
-  private touchSession(socket: WebSocket) {
+  private handleJoinRoom(socket: WebSocket, message: JoinRoomMessage) {
+    if (!isAddress(message.address)) {
+      this.send(socket, { type: "error", message: "Invalid address in room join" });
+      return;
+    }
+
+    const now = Date.now();
+    const session = this.roomSessions.get(socket) ?? {};
+    const previousAddress = session.address;
+    const existing = this.roomParticipants.get(message.address);
+
+    this.roomParticipants.set(message.address, {
+      address: message.address,
+      joinedAt: existing?.joinedAt ?? now,
+      lastSeen: now,
+      present: true,
+      monsterId: existing?.monsterId,
+      monsterName: existing?.monsterName,
+      stage: existing?.stage,
+      stakeSui: existing?.stakeSui,
+      ready: existing?.ready ?? false,
+    });
+
+    session.address = message.address;
+    this.roomSessions.set(socket, session);
+
+    if (previousAddress && previousAddress !== message.address && !this.hasActiveRoomSessionForAddress(previousAddress)) {
+      const previous = this.roomParticipants.get(previousAddress);
+      if (previous) {
+        previous.present = false;
+        previous.ready = false;
+      }
+    }
+
+    this.pushRoomNotice(`${short(message.address)} entered the room.`, "info");
+    this.persistRoomState();
+    this.broadcastRoomState();
+  }
+
+  private handleLeaveRoom(socket: WebSocket, message: LeaveRoomMessage) {
+    const session = this.roomSessions.get(socket);
+    const address = session?.address ?? message.address;
+    if (!address) return;
+
+    this.roomSessions.delete(socket);
+
+    if (!this.hasActiveRoomSessionForAddress(address)) {
+      const participant = this.roomParticipants.get(address);
+      if (participant) {
+        participant.present = false;
+        participant.ready = false;
+        participant.lastSeen = Date.now();
+      }
+      this.pushRoomNotice(`${short(address)} left the room.`, "warn");
+      this.persistRoomState();
+    }
+
+    this.broadcastRoomState();
+    try {
+      socket.close(1000, "Client left room");
+    } catch {
+      // No-op
+    }
+  }
+
+  private handleRoomSelect(socket: WebSocket, message: RoomSelectMessage) {
+    if (!isAddress(message.address)) return;
+    const session = this.roomSessions.get(socket);
+    if (session?.address !== message.address) return;
+
+    const participant = this.ensureRoomParticipant(message.address);
+    participant.monsterId = message.monsterId;
+    participant.monsterName = message.monsterName;
+    participant.stage = Number.isFinite(message.stage) ? Number(message.stage) : participant.stage;
+    participant.lastSeen = Date.now();
+
+    this.persistRoomState();
+    this.broadcastRoomState();
+  }
+
+  private handleRoomStake(socket: WebSocket, message: RoomStakeMessage) {
+    if (!isAddress(message.address)) return;
+    const session = this.roomSessions.get(socket);
+    if (session?.address !== message.address) return;
+
+    const participant = this.ensureRoomParticipant(message.address);
+    participant.stakeSui = String(message.stakeSui ?? "0");
+    participant.lastSeen = Date.now();
+
+    this.persistRoomState();
+    this.broadcastRoomState();
+  }
+
+  private handleRoomReady(socket: WebSocket, message: RoomReadyMessage) {
+    if (!isAddress(message.address)) return;
+    const session = this.roomSessions.get(socket);
+    if (session?.address !== message.address) return;
+
+    const participant = this.ensureRoomParticipant(message.address);
+    participant.ready = Boolean(message.ready);
+    participant.lastSeen = Date.now();
+
+    this.pushRoomNotice(
+      participant.ready ? `${short(message.address)} is ready.` : `${short(message.address)} is not ready.`,
+      participant.ready ? "success" : "info"
+    );
+
+    this.persistRoomState();
+    this.broadcastRoomState();
+  }
+
+  private ensureRoomParticipant(address: string): RoomParticipant {
+    const existing = this.roomParticipants.get(address);
+    if (existing) return existing;
+
+    const created: RoomParticipant = {
+      address,
+      joinedAt: Date.now(),
+      lastSeen: Date.now(),
+      present: true,
+      ready: false,
+    };
+    this.roomParticipants.set(address, created);
+    return created;
+  }
+
+  private touchLobbySession(socket: WebSocket) {
     const session = this.sessions.get(socket);
     if (!session?.address) return;
 
@@ -408,6 +682,17 @@ export class ArenaLobby {
     if (!player) return;
 
     player.lastSeen = Date.now();
+  }
+
+  private touchRoomSession(socket: WebSocket) {
+    const session = this.roomSessions.get(socket);
+    if (!session?.address) return;
+
+    const participant = this.roomParticipants.get(session.address);
+    if (!participant) return;
+
+    participant.lastSeen = Date.now();
+    participant.present = true;
   }
 
   private pushRecent(summary: string) {
@@ -422,9 +707,28 @@ export class ArenaLobby {
     }
   }
 
+  private pushRoomNotice(summary: string, tone: RoomNotice["tone"]) {
+    const item: RoomNotice = {
+      id: nextId("room_notice"),
+      summary,
+      timestamp: Date.now(),
+      tone,
+    };
+    this.roomNotices.unshift(item);
+    if (this.roomNotices.length > MAX_ROOM_NOTICES) {
+      this.roomNotices.length = MAX_ROOM_NOTICES;
+    }
+  }
+
   private broadcastLobbyState() {
     for (const socket of this.sessions.keys()) {
       this.sendLobbyState(socket);
+    }
+  }
+
+  private broadcastRoomState() {
+    for (const socket of this.roomSessions.keys()) {
+      this.sendRoomState(socket);
     }
   }
 
@@ -448,6 +752,20 @@ export class ArenaLobby {
     });
   }
 
+  private sendRoomState(socket: WebSocket) {
+    const participants = [...this.roomParticipants.values()].sort((a, b) => a.joinedAt - b.joinedAt);
+    this.send(socket, {
+      type: "roomState",
+      room: {
+        createdAt: this.roomCreatedAt,
+        updatedAt: Date.now(),
+        participants,
+        notices: this.roomNotices,
+        roomReady: participants.filter((participant) => participant.ready).length >= 2,
+      },
+    });
+  }
+
   private sendToAddress(address: string, payload: unknown) {
     for (const [socket, session] of this.sessions) {
       if (session.address === address) {
@@ -460,12 +778,20 @@ export class ArenaLobby {
     try {
       socket.send(toJson(payload));
     } catch {
-      this.onDisconnect(socket);
+      this.onLobbyDisconnect(socket);
+      this.onRoomDisconnect(socket);
     }
   }
 
-  private hasActiveSessionForAddress(address: string): boolean {
+  private hasActiveLobbySessionForAddress(address: string): boolean {
     for (const session of this.sessions.values()) {
+      if (session.address === address) return true;
+    }
+    return false;
+  }
+
+  private hasActiveRoomSessionForAddress(address: string): boolean {
+    for (const session of this.roomSessions.values()) {
       if (session.address === address) return true;
     }
     return false;
@@ -485,5 +811,13 @@ export class ArenaLobby {
         this.invites.delete(inviteId);
       }
     }
+  }
+
+  private persistRoomState() {
+    void this.state.storage.put(ROOM_STATE_KEY, {
+      participants: [...this.roomParticipants.values()],
+      notices: this.roomNotices,
+      createdAt: this.roomCreatedAt,
+    } satisfies StoredRoomState);
   }
 }

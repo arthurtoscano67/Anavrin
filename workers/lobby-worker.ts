@@ -11,8 +11,17 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/lobby") {
-      const room = url.searchParams.get("room") || "global";
-      const id = env.ARENA_LOBBY.idFromName(room);
+      const id = env.ARENA_LOBBY.idFromName("global-lobby");
+      const stub = env.ARENA_LOBBY.get(id);
+      return stub.fetch(request);
+    }
+
+    if (url.pathname.startsWith("/room/")) {
+      const roomId = url.pathname.replace(/^\/room\//, "").trim();
+      if (!roomId) {
+        return new Response("Missing room id", { status: 400 });
+      }
+      const id = env.ARENA_LOBBY.idFromName(`room:${roomId}`);
       const stub = env.ARENA_LOBBY.get(id);
       return stub.fetch(request);
     }
@@ -22,6 +31,7 @@ export default {
         ok: true,
         service: "anavrin-arena-lobby",
         websocket: "/lobby",
+        roomWebsocket: "/room/:roomId",
       }),
       {
         headers: {
