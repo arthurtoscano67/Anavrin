@@ -13,6 +13,8 @@ type ArenaLobbyProps = {
   selfAddress?: string;
   connectionState: LobbyConnectionState;
   isConnected: boolean;
+  endpoint: string;
+  lastError?: string | null;
   players: LobbyPlayer[];
   openMatches: LobbyOpenMatch[];
   invites: LobbyInvite[];
@@ -43,6 +45,8 @@ export function ArenaLobby({
   selfAddress,
   connectionState,
   isConnected,
+  endpoint,
+  lastError,
   players,
   openMatches,
   invites,
@@ -83,6 +87,14 @@ export function ArenaLobby({
           {connectionState}
         </span>
       </div>
+
+      {!isConnected && (
+        <div className="rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-xs text-red-200">
+          <div className="font-semibold">Lobby disconnected</div>
+          {lastError ? <div className="mt-1 text-red-100/90">{lastError}</div> : null}
+          <div className="mt-1 text-red-100/70">Endpoint: {endpoint || "not set"}</div>
+        </div>
+      )}
 
       <div className="rounded-xl border border-borderSoft bg-black/20 p-3">
         <div className="mb-2 text-xs font-semibold text-gray-300">Create Open Match</div>

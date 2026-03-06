@@ -596,6 +596,8 @@ export function ArenaPage() {
           selfAddress={account?.address}
           connectionState={lobby.connectionState}
           isConnected={lobby.isConnected}
+          endpoint={lobby.endpoint}
+          lastError={lobby.lastError}
           players={lobby.players}
           openMatches={lobby.openMatches}
           invites={lobby.invites}

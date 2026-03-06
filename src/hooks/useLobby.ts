@@ -103,6 +103,8 @@ type ServerMessage = LobbyStateMessage | InviteMessage | MatchStartedMessage | E
 const INITIAL_RECONNECT_DELAY_MS = 1_000;
 const MAX_RECONNECT_DELAY_MS = 10_000;
 const PING_INTERVAL_MS = 20_000;
+const SAME_ORIGIN_HTML_LOBBY_ERROR =
+  "Lobby endpoint is serving the site HTML, not a WebSocket Worker. Set VITE_LOBBY_WS_URL to your Worker URL (wss://<your-worker>.workers.dev/lobby).";
 
 function normalizeEndpoint(raw: string): string {
   if (!raw) return raw;
@@ -123,6 +125,43 @@ function normalizeEndpoint(raw: string): string {
   }
 
   return raw;
+}
+
+function toHttpEndpoint(wsEndpoint: string): string | null {
+  if (wsEndpoint.startsWith("wss://")) {
+    return `https://${wsEndpoint.slice("wss://".length)}`;
+  }
+  if (wsEndpoint.startsWith("ws://")) {
+    return `http://${wsEndpoint.slice("ws://".length)}`;
+  }
+  return null;
+}
+
+async function detectSameOriginHtmlLobby(wsEndpoint: string): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+
+  const httpEndpoint = toHttpEndpoint(wsEndpoint);
+  if (!httpEndpoint) return null;
+
+  const endpointUrl = new URL(httpEndpoint);
+  if (endpointUrl.host !== window.location.host) {
+    return null;
+  }
+  if (endpointUrl.pathname !== "/lobby") {
+    return null;
+  }
+
+  try {
+    const response = await fetch(endpointUrl.toString(), { method: "GET" });
+    const contentType = (response.headers.get("content-type") || "").toLowerCase();
+    if (response.ok && contentType.includes("text/html")) {
+      return SAME_ORIGIN_HTML_LOBBY_ERROR;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 function resolveEndpoint(explicit?: string): string {
@@ -171,6 +210,7 @@ export function useLobby(options: UseLobbyOptions): UseLobbyResult {
   const pingTimerRef = useRef<number | undefined>(undefined);
   const reconnectAttemptRef = useRef(0);
   const shouldReconnectRef = useRef(true);
+  const blockedEndpointRef = useRef<string | null>(null);
 
   const [connectionState, setConnectionState] = useState<LobbyConnectionState>("idle");
   const [players, setPlayers] = useState<LobbyPlayer[]>([]);
@@ -212,7 +252,15 @@ export function useLobby(options: UseLobbyOptions): UseLobbyResult {
 
   const scheduleReconnect = useCallback(
     (connect: () => void) => {
-      if (!shouldReconnectRef.current || !enabled || !address || !endpoint) return;
+      if (
+        !shouldReconnectRef.current ||
+        !enabled ||
+        !address ||
+        !endpoint ||
+        blockedEndpointRef.current === endpoint
+      ) {
+        return;
+      }
 
       clearReconnectTimer();
       const attempt = reconnectAttemptRef.current;
@@ -307,12 +355,16 @@ export function useLobby(options: UseLobbyOptions): UseLobbyResult {
       }
       clearPingTimer();
       setConnectionState("closed");
+      if (!lastError) {
+        setLastError(`Lobby socket closed (${endpoint})`);
+      }
       scheduleReconnect(connect);
     };
-  }, [address, clearPingTimer, enabled, endpoint, scheduleReconnect, sendJoin, sendRaw]);
+  }, [address, clearPingTimer, enabled, endpoint, lastError, scheduleReconnect, sendJoin, sendRaw]);
 
   useEffect(() => {
     shouldReconnectRef.current = true;
+    blockedEndpointRef.current = null;
 
     if (!enabled || !address || !endpoint) {
       setPlayers([]);
@@ -325,9 +377,21 @@ export function useLobby(options: UseLobbyOptions): UseLobbyResult {
       };
     }
 
-    connect();
+    let cancelled = false;
+    void (async () => {
+      const misconfiguredError = await detectSameOriginHtmlLobby(endpoint);
+      if (cancelled) return;
+      if (misconfiguredError) {
+        blockedEndpointRef.current = endpoint;
+        setConnectionState("error");
+        setLastError(misconfiguredError);
+        return;
+      }
+      connect();
+    })();
 
     return () => {
+      cancelled = true;
       shouldReconnectRef.current = false;
       clearReconnectTimer();
       clearPingTimer();

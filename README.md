@@ -45,6 +45,23 @@ npm install
 cp .env.example .env.local
 ```
 
+Required for realtime Arena Lobby on Cloudflare Pages:
+
+- `VITE_LOBBY_WS_URL=wss://<your-worker>.workers.dev/lobby`
+
+If this is missing, `/lobby` on Pages will serve static HTML and lobby presence will stay offline.
+
+Deploy the lobby worker + Durable Object:
+
+```bash
+npm run lobby:deploy
+```
+
+Then add the Worker URL to your Cloudflare Pages project env:
+
+- Variable: `VITE_LOBBY_WS_URL`
+- Value: `wss://<your-worker>.workers.dev/lobby`
+
 3. Run dev server:
 
 ```bash
