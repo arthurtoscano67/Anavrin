@@ -29,7 +29,7 @@ type LobbyEnvelope = {
 };
 
 const RECONNECT_MS = 1800;
-const PING_MS = 20_000;
+const PING_MS = 10_000;
 
 export function useLobbyPresence({ enabled, address, monsterName = 'Legend', level = 1 }: UseLobbyPresenceOptions) {
   const [connectionState, setConnectionState] = useState<LobbyConnectionState>('closed');
@@ -156,9 +156,9 @@ export function useLobbyPresence({ enabled, address, monsterName = 'Legend', lev
   }, [address, cleanupTimers, enabled, endpoint, level, monsterName, send]);
 
   const invitePlayer = useCallback(
-    (to: string) => {
+    (to: string, roomId: string) => {
       if (!address) return;
-      send({ type: 'invite', from: address, to });
+      send({ type: 'invite', from: address, to, roomId });
     },
     [address, send]
   );
@@ -179,7 +179,7 @@ export function useLobbyPresence({ enabled, address, monsterName = 'Legend', lev
   );
 
   const announceMatchStarted = useCallback(
-    (input: { from: string; to: string; openMatchId?: string; inviteId?: string; matchId?: string }) => {
+    (input: { from: string; to: string; roomId?: string; openMatchId?: string; inviteId?: string; matchId?: string }) => {
       send({ type: 'matchStarted', ...input });
     },
     [send]

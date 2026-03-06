@@ -173,7 +173,14 @@ export function buildRoomModel(input: {
   let nextActionLabel = 'Invite';
   let opponentStatusLabel = opponent?.present ? 'Online' : 'Offline';
 
-  if (match && match.status === 3) {
+  if (!match && participants.length > 0) {
+    heroTitle = 'Room open.';
+    heroHint = participants.length === 1
+      ? 'Invite sent. Wait for the other trainer to accept so the on-chain match can open.'
+      : 'Both trainers are here. Wait for the on-chain match to load, then deposit your legends.';
+    nextActionLabel = 'Wait';
+    opponentStatusLabel = opponent?.present ? 'In room' : 'Invite pending';
+  } else if (match && match.status === 3) {
     heroTitle = 'Battle cancelled.';
     heroHint = 'The room was cancelled. Legends should be back with their trainers.';
     nextActionLabel = 'Back to lobby';

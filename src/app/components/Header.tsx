@@ -9,33 +9,34 @@ export function Header() {
 
   return (
     <header className="safe-top sticky top-0 z-40 border-b border-borderSoft bg-background/90 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-3">
+      <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4">
+        <div className="flex items-start justify-between gap-3">
           <div className="grid h-11 w-11 place-items-center rounded-xl border border-purple/40 bg-purple/20 text-xl">💗</div>
-          <div>
-            <div className="text-lg font-extrabold tracking-tight">Anavrin Legends</div>
-            <div className="text-xs text-gray-400">
-              {account ? `Connected: ${short(account.address)}` : "Sui Mainnet • Living NFT Game"}
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-lg font-extrabold tracking-tight">Anavrin Legends</div>
+            <div className="truncate text-xs text-gray-400">
+              {account ? `Connected: ${short(account.address)}` : 'Sui Mainnet • Living NFT Game'}
             </div>
+          </div>
+          <div className="shrink-0">
+            <ConnectButton />
           </div>
         </div>
 
-        <nav className="no-scrollbar flex w-full items-center gap-2 overflow-x-auto whitespace-nowrap pb-1 lg:w-auto lg:flex-wrap lg:overflow-visible">
+        <nav className="grid w-full grid-cols-3 gap-2 sm:grid-cols-4 lg:flex lg:w-auto lg:flex-wrap">
           {ROUTES.map((r) => (
             <NavLink
               key={r.path}
               to={r.path}
               end={r.path === "/"}
-              className={({ isActive }) => `nav-link ${isActive ? "nav-link-active" : ""}`}
+              className={({ isActive }) =>
+                `nav-link flex min-h-[44px] items-center justify-center text-center ${isActive ? 'nav-link-active' : ''}`
+              }
             >
               {r.label}
             </NavLink>
           ))}
         </nav>
-
-        <div className="self-start lg:self-auto">
-          <ConnectButton />
-        </div>
       </div>
     </header>
   );

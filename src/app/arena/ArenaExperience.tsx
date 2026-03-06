@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 
 import { PageShell } from '../components/PageShell';
 import { LoadingGrid } from '../components/LoadingGrid';
+import { useArena } from '../hooks/useArena';
 import { useAnavrinData } from '../hooks/useAnavrinData';
 import { useArenaMatches } from '../hooks/useArenaMatches';
 import { useTxExecutor } from '../hooks/useTxExecutor';
@@ -13,6 +14,7 @@ import { ARENA_MATCH_TYPE, CLOCK_ID, MODULE, PACKAGE_ID, TREASURY_ID } from '../
 import { short, toMist } from '../lib/format';
 import { fetchArenaMatch, fetchMatchResolution } from '../lib/sui';
 import type { ArenaMatch, MatchResolution, Monster } from '../lib/types';
+import { generateBattleRoomId } from '../../server/arenaRooms';
 import { buildBattlePreview, buildRoomModel, type ArenaScreen } from './battle-engine/battleEngine';
 import { BattleRoomScreen } from './battle-room/BattleRoomScreen';
 import { BattleArenaScreen } from './arena-ui/BattleArenaScreen';
@@ -42,13 +44,12 @@ export function ArenaExperience() {
   const { walletMonsters, recentMatches } = useAnavrinData();
   const arenaMatches = useArenaMatches(account?.address);
   const { execute, executeAndFetchBlock } = useTxExecutor();
+  const arena = useArena(params.get('match') ?? '', params.get('room') ?? '');
 
   const [selectedMonsterId, setSelectedMonsterId] = useState(params.get('monster') ?? '');
   const [selectedStake, setSelectedStake] = useState('0');
-  const [currentMatchId, setCurrentMatchId] = useState(params.get('match') ?? '');
   const [activeMatch, setActiveMatch] = useState<ArenaMatch | null>(null);
   const [resolution, setResolution] = useState<MatchResolution | null>(null);
-  const [screen, setScreen] = useState<ArenaScreen>('lobby');
   const [pending, setPending] = useState<string | null>(null);
   const [frameIndex, setFrameIndex] = useState(0);
   const [animatingBattle, setAnimatingBattle] = useState(false);
@@ -67,7 +68,7 @@ export function ArenaExperience() {
 
   const roomPresenceEnabled = Boolean(
     account?.address &&
-    currentMatchId &&
+    arena.currentRoomId &&
     (!activeMatch || isRoomMessageRelevant(activeMatch, account.address))
   );
 
@@ -80,7 +81,7 @@ export function ArenaExperience() {
 
   const room = useRoomPresence({
     enabled: roomPresenceEnabled,
-    roomId: currentMatchId || undefined,
+    roomId: arena.currentRoomId || undefined,
     address: account?.address,
   });
 
@@ -115,63 +116,83 @@ export function ArenaExperience() {
       ]);
       setActiveMatch(match);
       setResolution(nextResolution);
-      setCurrentMatchId(matchId);
+      arena.setCurrentMatchId(matchId);
       arenaMatches.persistMatchId(matchId);
       setParams((prev) => {
         const next = new URLSearchParams(prev);
         next.set('match', matchId);
+        if (arena.currentRoomId) next.set('room', arena.currentRoomId);
         return next;
       });
-      setScreen(nextResolution || match?.status === 2 ? 'battle' : nextScreen);
+      arena.setScreen(nextResolution || match?.status === 2 ? 'battle' : nextScreen);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not load match');
     } finally {
       setPending(null);
     }
-  }, [arenaMatches, client, setParams]);
+  }, [arena, arenaMatches, client, setParams]);
 
   useEffect(() => {
     const urlMonster = params.get('monster');
     if (urlMonster) setSelectedMonsterId(urlMonster);
+    const urlRoom = params.get('room');
+    if (urlRoom && urlRoom !== arena.currentRoomId) {
+      arena.persistRoomId(urlRoom);
+    }
 
     const urlMatch = params.get('match');
     if (urlMatch && activeMatch?.objectId !== urlMatch) {
-      setCurrentMatchId(urlMatch);
+      arena.setCurrentMatchId(urlMatch);
       void loadMatch(urlMatch, 'battle');
       return;
     }
 
-    if (!urlMatch && !currentMatchId && arenaMatches.restoredOwnedMatch) {
+    if (!urlMatch && !arena.currentMatchId && arenaMatches.restoredOwnedMatch) {
       void loadMatch(arenaMatches.restoredOwnedMatch.objectId, 'room');
     }
-  }, [activeMatch?.objectId, arenaMatches.restoredOwnedMatch, currentMatchId, loadMatch, params]);
+  }, [activeMatch?.objectId, arena, arenaMatches.restoredOwnedMatch, loadMatch, params]);
 
   useEffect(() => {
-    if (!currentMatchId || activeMatch?.objectId === currentMatchId) return;
-    void loadMatch(currentMatchId, screen === 'battle' ? 'battle' : 'room');
-  }, [activeMatch?.objectId, currentMatchId, loadMatch, screen]);
+    if (!arena.currentMatchId || activeMatch?.objectId === arena.currentMatchId) return;
+    void loadMatch(arena.currentMatchId, arena.screen === 'battle' ? 'battle' : 'room');
+  }, [activeMatch?.objectId, arena.currentMatchId, arena.screen, loadMatch]);
+
+  useEffect(() => {
+    if (arena.currentRoomId) return;
+    if (!arena.currentMatchId) return;
+    arena.persistRoomId(arena.currentMatchId);
+  }, [arena]);
 
   useEffect(() => {
     if (!lobbyStartedMatch?.matchId) return;
-    if (lobbyStartedMatch.matchId === currentMatchId) {
+    const nextRoomId = lobbyStartedMatch.roomId || lobbyStartedMatch.matchId;
+    if (nextRoomId) {
+      arena.persistRoomId(nextRoomId);
+      setParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('room', nextRoomId);
+        return next;
+      });
+    }
+    if (lobbyStartedMatch.matchId === arena.currentMatchId) {
       clearLobbyStartedMatch();
       return;
     }
     void loadMatch(lobbyStartedMatch.matchId, 'room');
     toast.success(`Battle room ready with ${short(lobbyStartedMatch.from === account?.address ? lobbyStartedMatch.to : lobbyStartedMatch.from)}.`);
     clearLobbyStartedMatch();
-  }, [account?.address, clearLobbyStartedMatch, currentMatchId, loadMatch, lobbyStartedMatch]);
+  }, [account?.address, arena, clearLobbyStartedMatch, loadMatch, lobbyStartedMatch, setParams]);
 
   useEffect(() => {
-    if (!currentMatchId || !activeMatch || !isRoomMessageRelevant(activeMatch, account?.address)) return;
+    if (!arena.currentMatchId || !activeMatch || !isRoomMessageRelevant(activeMatch, account?.address)) return;
     if (activeMatch.status === 2 || resolution) {
-      setScreen('battle');
+      arena.setScreen('battle');
       return;
     }
     if (room.roomReady && activeMatch.status === 1) {
-      setScreen('battle');
+      arena.setScreen('battle');
     }
-  }, [account?.address, activeMatch, currentMatchId, resolution, room.roomReady]);
+  }, [account?.address, activeMatch, arena, resolution, room.roomReady]);
 
   const roomModel = useMemo(
     () => buildRoomModel({
@@ -186,18 +207,33 @@ export function ArenaExperience() {
   const battlePreview = useMemo(() => buildBattlePreview(activeMatch, resolution), [activeMatch, resolution]);
 
   const playerAParticipant = useMemo(
-    () => (activeMatch ? room.participants.find((participant) => participant.address === activeMatch.player_a) : undefined),
-    [activeMatch, room.participants]
+    () => {
+      const playerAAddress = activeMatch?.player_a ?? room.participants[0]?.address;
+      return playerAAddress ? room.participants.find((participant) => participant.address === playerAAddress) : undefined;
+    },
+    [activeMatch?.player_a, room.participants]
   );
   const playerBParticipant = useMemo(
-    () => (activeMatch ? room.participants.find((participant) => participant.address === activeMatch.player_b) : undefined),
-    [activeMatch, room.participants]
+    () => {
+      const playerAAddress = activeMatch?.player_a ?? room.participants[0]?.address;
+      const playerBAddress = activeMatch?.player_b
+        ?? room.participants.find((participant) => participant.address !== playerAAddress)?.address;
+      return playerBAddress ? room.participants.find((participant) => participant.address === playerBAddress) : undefined;
+    },
+    [activeMatch?.player_a, activeMatch?.player_b, room.participants]
   );
 
-  const playerAMonster = activeMatch?.monster_a_data ?? buildPreviewMonster(playerAParticipant) ?? (activeMatch?.player_a === account?.address ? selectedMonster : null);
-  const playerBMonster = activeMatch?.monster_b_data ?? buildPreviewMonster(playerBParticipant) ?? (activeMatch?.player_b === account?.address ? selectedMonster : null);
+  const playerAAddress = activeMatch?.player_a ?? playerAParticipant?.address;
+  const playerBAddress = activeMatch?.player_b ?? playerBParticipant?.address;
 
-  const createMatchAgainst = useCallback(async (opponentAddress: string, meta?: { inviteId?: string; openMatchId?: string }) => {
+  const playerAMonster = activeMatch?.monster_a_data
+    ?? buildPreviewMonster(playerAParticipant)
+    ?? (playerAAddress === account?.address ? selectedMonster : null);
+  const playerBMonster = activeMatch?.monster_b_data
+    ?? buildPreviewMonster(playerBParticipant)
+    ?? (playerBAddress === account?.address ? selectedMonster : null);
+
+  const createMatchAgainst = useCallback(async (opponentAddress: string, meta?: { inviteId?: string; openMatchId?: string; roomId?: string }) => {
     if (!account?.address) {
       toast.error('Connect wallet first');
       return;
@@ -222,38 +258,55 @@ export function ArenaExperience() {
       }
 
       const matchId = created.objectId;
+      const roomId = meta?.roomId || generateBattleRoomId(account.address, opponentAddress);
+      arena.persistRoomId(roomId);
       lobby.announceMatchStarted({
         from: account.address,
         to: opponentAddress,
+        roomId,
         inviteId: meta?.inviteId,
         openMatchId: meta?.openMatchId,
         matchId,
+      });
+      setParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('room', roomId);
+        return next;
       });
       await loadMatch(matchId, 'room');
     } finally {
       setPending(null);
     }
-  }, [account?.address, executeAndFetchBlock, loadMatch, lobby, selectedMonster]);
+  }, [account?.address, arena, executeAndFetchBlock, loadMatch, lobby, selectedMonster, setParams]);
 
   const handleInvite = useCallback((address: string) => {
     if (!selectedMonster) {
       toast.error('Pick your legend first');
       return;
     }
-    lobby.invitePlayer(address);
+    const roomId = generateBattleRoomId(account!.address, address);
+    lobby.invitePlayer(address, roomId);
+    arena.persistRoomId(roomId);
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('room', roomId);
+      next.set('monster', selectedMonster.objectId);
+      return next;
+    });
+    arena.setScreen('room');
     toast.success(`Invite sent to ${short(address)}.`);
-  }, [lobby, selectedMonster]);
+  }, [account, arena, lobby, selectedMonster, setParams]);
 
   const handleAcceptInvite = useCallback(async (invite: LobbyInvite) => {
-    await createMatchAgainst(invite.from, { inviteId: invite.id });
+    await createMatchAgainst(invite.from, { inviteId: invite.id, roomId: invite.roomId });
   }, [createMatchAgainst]);
 
   const handleJoinOpenMatch = useCallback(async (openMatch: LobbyOpenMatch) => {
-    await createMatchAgainst(openMatch.creator, { openMatchId: openMatch.id });
-  }, [createMatchAgainst]);
+    await createMatchAgainst(openMatch.creator, { openMatchId: openMatch.id, roomId: generateBattleRoomId(account!.address, openMatch.creator) });
+  }, [account, createMatchAgainst]);
 
   const handleDeposit = useCallback(async () => {
-    if (!account?.address || !currentMatchId || !selectedMonster) {
+    if (!account?.address || !arena.currentMatchId || !selectedMonster) {
       toast.error('Pick a room and a legend first');
       return;
     }
@@ -263,7 +316,7 @@ export function ArenaExperience() {
       const tx = new Transaction();
       tx.moveCall({
         target: `${PACKAGE_ID}::${MODULE}::deposit_monster`,
-        arguments: [tx.object(currentMatchId), tx.object(selectedMonster.objectId), tx.object(CLOCK_ID)],
+        arguments: [tx.object(arena.currentMatchId), tx.object(selectedMonster.objectId), tx.object(CLOCK_ID)],
       });
 
       const stakeMist = toMist(selectedStake);
@@ -271,36 +324,36 @@ export function ArenaExperience() {
         const [stakeCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(stakeMist)]);
         tx.moveCall({
           target: `${PACKAGE_ID}::${MODULE}::deposit_stake`,
-          arguments: [tx.object(currentMatchId), stakeCoin, tx.object(CLOCK_ID)],
+          arguments: [tx.object(arena.currentMatchId), stakeCoin, tx.object(CLOCK_ID)],
         });
       }
 
       await execute(tx, 'Legend deposited');
       roomSetReady(false);
       await walletMonsters.refetch();
-      await loadMatch(currentMatchId, 'room');
+      await loadMatch(arena.currentMatchId, 'room');
     } finally {
       setPending(null);
     }
-  }, [account?.address, currentMatchId, execute, loadMatch, roomSetReady, selectedMonster, selectedStake, walletMonsters]);
+  }, [account?.address, arena.currentMatchId, execute, loadMatch, roomSetReady, selectedMonster, selectedStake, walletMonsters]);
 
   const handleWithdraw = useCallback(async () => {
-    if (!currentMatchId) return;
+    if (!arena.currentMatchId) return;
     setPending('withdraw');
     try {
       const tx = new Transaction();
       tx.moveCall({
         target: `${PACKAGE_ID}::${MODULE}::withdraw`,
-        arguments: [tx.object(currentMatchId)],
+        arguments: [tx.object(arena.currentMatchId)],
       });
       await execute(tx, 'Legend returned');
       roomSetReady(false);
       await walletMonsters.refetch();
-      await loadMatch(currentMatchId, 'room');
+      await loadMatch(arena.currentMatchId, 'room');
     } finally {
       setPending(null);
     }
-  }, [currentMatchId, execute, loadMatch, roomSetReady, walletMonsters]);
+  }, [arena.currentMatchId, execute, loadMatch, roomSetReady, walletMonsters]);
 
   const handleToggleReady = useCallback(() => {
     const you = room.participants.find((participant) => participant.address === account?.address);
@@ -319,21 +372,21 @@ export function ArenaExperience() {
   }, [battlePreview]);
 
   const resolveBattle = useCallback(async () => {
-    if (!currentMatchId || !roomModel.canStartBattle) return;
+    if (!arena.currentMatchId || !roomModel.canStartBattle) return;
     setPending('battle');
     try {
       const tx = new Transaction();
       tx.moveCall({
         target: `${PACKAGE_ID}::${MODULE}::start_battle`,
-        arguments: [tx.object(currentMatchId), tx.object(TREASURY_ID), tx.object(CLOCK_ID)],
+        arguments: [tx.object(arena.currentMatchId), tx.object(TREASURY_ID), tx.object(CLOCK_ID)],
       });
       await execute(tx, 'Battle resolved');
       await playFrames();
-      await loadMatch(currentMatchId, 'battle');
+      await loadMatch(arena.currentMatchId, 'battle');
     } finally {
       setPending(null);
     }
-  }, [currentMatchId, execute, loadMatch, playFrames, roomModel.canStartBattle]);
+  }, [arena.currentMatchId, execute, loadMatch, playFrames, roomModel.canStartBattle]);
 
   const handleDefend = useCallback(() => {
     toast.message('Shield up!');
@@ -344,16 +397,16 @@ export function ArenaExperience() {
   }, []);
 
   const handleBackLobby = useCallback(() => {
-    setScreen('lobby');
-  }, []);
+    arena.setScreen('lobby');
+  }, [arena]);
 
   const handleOpenBattle = useCallback(() => {
-    setScreen('battle');
-  }, []);
+    arena.setScreen('battle');
+  }, [arena]);
 
   const liveMatches = useMemo(
-    () => arenaMatches.activeMatches.filter((match) => match.objectId !== currentMatchId).slice(0, 6),
-    [arenaMatches.activeMatches, currentMatchId]
+    () => arenaMatches.activeMatches.filter((match) => match.objectId !== arena.currentMatchId).slice(0, 6),
+    [arena.currentMatchId, arenaMatches.activeMatches]
   );
 
   const playerList = useMemo(
@@ -409,9 +462,9 @@ export function ArenaExperience() {
         {(['lobby', 'room', 'battle'] as ArenaScreen[]).map((step) => (
           <button
             key={step}
-            className={`rounded-full px-4 py-2 text-sm font-black uppercase tracking-[0.14em] ${screen === step ? 'bg-purple text-white' : 'border border-borderSoft bg-black/20 text-gray-300'}`}
-            onClick={() => setScreen(step)}
-            disabled={step !== 'lobby' && !currentMatchId}
+            className={`rounded-full px-4 py-2 text-sm font-black uppercase tracking-[0.14em] ${arena.screen === step ? 'bg-purple text-white' : 'border border-borderSoft bg-black/20 text-gray-300'}`}
+            onClick={() => arena.setScreen(step)}
+            disabled={step !== 'lobby' && !arena.currentMatchId}
           >
             {step}
           </button>
@@ -420,7 +473,7 @@ export function ArenaExperience() {
 
       {loading ? (
         <LoadingGrid count={3} />
-      ) : screen === 'lobby' ? (
+      ) : arena.screen === 'lobby' ? (
         <LobbyScreen
           players={playerList}
           invites={lobby.invites.filter((invite) => invite.to === account.address && invite.status === 'pending')}
@@ -437,11 +490,12 @@ export function ArenaExperience() {
             void loadMatch(matchId, 'battle');
           }}
         />
-      ) : screen === 'room' ? (
+      ) : arena.screen === 'room' ? (
         <BattleRoomScreen
           accountAddress={account.address}
           match={activeMatch}
-          currentMatchId={currentMatchId}
+          currentMatchId={arena.currentMatchId}
+          currentRoomId={arena.currentRoomId}
           resolution={resolution}
           roomParticipants={room.participants}
           roomNotices={room.notices}
@@ -475,7 +529,7 @@ export function ArenaExperience() {
           onSpecial={resolveBattle}
           onDefend={handleDefend}
           onEmote={handleEmote}
-          onBackRoom={() => setScreen('room')}
+          onBackRoom={() => arena.setScreen('room')}
           onBackLobby={handleBackLobby}
         />
       )}

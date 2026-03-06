@@ -18,6 +18,7 @@ export function BattleRoomScreen({
   accountAddress,
   match,
   currentMatchId,
+  currentRoomId,
   resolution,
   roomParticipants,
   roomNotices,
@@ -39,6 +40,7 @@ export function BattleRoomScreen({
   accountAddress?: string;
   match: ArenaMatch | null;
   currentMatchId?: string;
+  currentRoomId?: string;
   resolution: MatchResolution | null;
   roomParticipants: RoomParticipant[];
   roomNotices: RoomNotice[];
@@ -60,6 +62,32 @@ export function BattleRoomScreen({
   const playerA = match?.player_a;
   const playerB = match?.player_b;
   const roomLeader = roomParticipants.find((participant) => participant.address !== accountAddress);
+  const playerAAddress = playerA ?? roomParticipants[0]?.address;
+  const playerBAddress = playerB ?? roomParticipants.find((participant) => participant.address !== playerAAddress)?.address;
+  const youArePlayerA = Boolean(accountAddress && playerAAddress === accountAddress);
+  const youArePlayerB = Boolean(accountAddress && playerBAddress === accountAddress);
+  const waitingForMatch = Boolean(currentRoomId && !currentMatchId);
+  const sideAStateLabel = roomModel.playerAReady ? 'Ready' : match?.mon_a ? 'Deposited' : playerAAddress ? 'Waiting' : 'Open';
+  const sideBStateLabel = roomModel.playerBReady ? 'Ready' : match?.mon_b ? 'Deposited' : playerBAddress ? 'Waiting' : 'Open';
+  const showBattleButton = roomModel.bothReady && Boolean(currentMatchId);
+
+  const ActionBadge = ({
+    label,
+    active,
+  }: {
+    label: string;
+    active: boolean;
+  }) => (
+    <span
+      className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.14em] ${
+        active
+          ? 'border border-green-300/35 bg-green-500/15 text-green-100'
+          : 'border border-white/10 bg-white/5 text-gray-300'
+      }`}
+    >
+      {label}
+    </span>
+  );
 
   return (
     <div className="space-y-4">
@@ -74,21 +102,28 @@ export function BattleRoomScreen({
         </div>
 
         <div className="flex flex-wrap gap-2 text-xs font-semibold text-gray-300">
+          {currentRoomId ? <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Room {short(currentRoomId)}</span> : null}
           {currentMatchId ? <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Battle ID {short(currentMatchId)}</span> : null}
           {resolution ? <span className="rounded-full border border-yellow-300/30 bg-yellow-500/10 px-3 py-1 text-yellow-100">Finished</span> : null}
           {roomLeader ? <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Opponent {short(roomLeader.address)}</span> : null}
         </div>
+
+        {waitingForMatch ? (
+          <div className="rounded-[22px] border border-cyan/30 bg-cyan/10 p-4 text-sm text-cyan-50">
+            Invite sent. This room is live already. When the other trainer accepts, the battle vault opens and deposit becomes available.
+          </div>
+        ) : null}
       </section>
 
       <section className="arena-stage overflow-hidden rounded-[32px] border border-borderSoft p-4 sm:p-6">
         <div className="relative z-10 grid gap-4 lg:grid-cols-[1fr_120px_1fr] lg:items-center">
           <ArenaMonsterPanel
             title="Player A"
-            address={playerA}
+            address={playerAAddress}
             monster={playerAMonster}
             ready={Boolean(match?.mon_a)}
             side="left"
-            stateLabel={roomModel.playerAReady ? 'READY' : match?.mon_a ? 'Loaded' : 'Waiting'}
+            stateLabel={sideAStateLabel}
           />
 
           <div className="grid place-items-center">
@@ -97,12 +132,37 @@ export function BattleRoomScreen({
 
           <ArenaMonsterPanel
             title="Player B"
-            address={playerB}
+            address={playerBAddress}
             monster={playerBMonster}
             ready={Boolean(match?.mon_b)}
             side="right"
-            stateLabel={roomModel.playerBReady ? 'READY' : match?.mon_b ? 'Loaded' : roomModel.opponentStatusLabel}
+            stateLabel={sideBStateLabel}
           />
+        </div>
+
+        <div className="relative z-10 mt-4 grid gap-3 lg:grid-cols-2">
+          <div className="rounded-[22px] border border-white/10 bg-black/25 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-black uppercase tracking-[0.16em] text-white/80">Player A</div>
+              {youArePlayerA ? <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-black text-white">YOU</span> : null}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <ActionBadge label="Deposit" active={Boolean(match?.mon_a)} />
+              <ActionBadge label="Ready" active={roomModel.playerAReady} />
+              <ActionBadge label="Withdraw" active={Boolean(match?.mon_a && match?.status === 0)} />
+            </div>
+          </div>
+          <div className="rounded-[22px] border border-white/10 bg-black/25 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-black uppercase tracking-[0.16em] text-white/80">Player B</div>
+              {youArePlayerB ? <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-black text-white">YOU</span> : null}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <ActionBadge label="Deposit" active={Boolean(match?.mon_b)} />
+              <ActionBadge label="Ready" active={roomModel.playerBReady} />
+              <ActionBadge label="Withdraw" active={Boolean(match?.mon_b && match?.status === 0)} />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -163,7 +223,7 @@ export function BattleRoomScreen({
       ) : null}
 
       <div className="safe-bottom sticky bottom-0 z-20 -mx-4 border-t border-borderSoft bg-background/95 px-4 py-3 backdrop-blur-xl">
-        <div className="mx-auto grid max-w-5xl grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="mx-auto grid max-w-5xl grid-cols-1 gap-3 sm:grid-cols-4">
           <button
             className="min-h-[68px] rounded-[22px] border border-red-300/35 bg-red-500/15 text-lg font-black text-red-100 disabled:opacity-50"
             onClick={onWithdraw}
@@ -180,11 +240,14 @@ export function BattleRoomScreen({
           </button>
           <button
             className={`min-h-[68px] rounded-[22px] text-lg font-black disabled:opacity-50 ${roomModel.bothReady ? 'bg-gradient-to-r from-fuchsia-400 to-pink-500 text-slate-950' : 'border border-borderSoft bg-black/20 text-gray-300'}`}
-            onClick={roomModel.bothReady ? onOpenBattle : onDeposit}
-            disabled={pending !== null || (!roomModel.bothReady && !roomModel.canDeposit)}
+            onClick={showBattleButton ? onOpenBattle : onDeposit}
+            disabled={pending !== null || (showBattleButton ? false : !roomModel.canDeposit || !currentMatchId)}
           >
-            {roomModel.bothReady ? 'OPEN BATTLE' : 'DEPOSIT NFT'}
+            {showBattleButton ? 'BATTLE' : waitingForMatch ? 'WAITING FOR ACCEPT' : 'DEPOSIT'}
           </button>
+          <div className="grid place-items-center rounded-[22px] border border-white/10 bg-white/5 px-4 text-center text-sm font-semibold text-gray-300">
+            {showBattleButton ? 'Both legends are ready. Enter battle now.' : 'Battle unlocks when both trainers deposit and tap READY.'}
+          </div>
         </div>
       </div>
     </div>

@@ -21,6 +21,7 @@ export type LobbyInvite = {
   id: string;
   from: string;
   to: string;
+  roomId: string;
   monsterName: string;
   level: number;
   createdAt: number;
@@ -37,6 +38,7 @@ export type StartedMatch = {
   id: string;
   from: string;
   to: string;
+  roomId?: string;
   openMatchId?: string;
   inviteId?: string;
   matchId?: string;

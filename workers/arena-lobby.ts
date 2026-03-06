@@ -19,6 +19,7 @@ export type LobbyInvite = {
   id: string;
   from: string;
   to: string;
+  roomId: string;
   monsterName: string;
   level: number;
   createdAt: number;
@@ -35,6 +36,7 @@ export type StartedMatch = {
   id: string;
   from: string;
   to: string;
+  roomId?: string;
   openMatchId?: string;
   inviteId?: string;
   matchId?: string;
@@ -76,6 +78,7 @@ type InviteMessage = {
   type: "invite";
   from: string;
   to: string;
+  roomId?: string;
 };
 
 type MatchCreatedMessage = {
@@ -92,6 +95,7 @@ type MatchStartedMessage = {
   type: "matchStarted";
   from: string;
   to: string;
+  roomId?: string;
   openMatchId?: string;
   inviteId?: string;
   matchId?: string;
@@ -442,6 +446,7 @@ export class ArenaLobby {
       id: nextId("invite"),
       from: message.from,
       to: message.to,
+      roomId: message.roomId || nextId("room"),
       monsterName: sender.monsterName,
       level: sender.level,
       createdAt: Date.now(),
@@ -495,6 +500,7 @@ export class ArenaLobby {
           id: nextId("started"),
           from: message.creator,
           to: message.opponent,
+          roomId: message.matchId,
           matchId: message.matchId,
           startedAt: Date.now(),
         };
@@ -535,6 +541,7 @@ export class ArenaLobby {
       id: nextId("started"),
       from: message.from,
       to: message.to,
+      roomId: message.roomId,
       openMatchId: message.openMatchId,
       inviteId: message.inviteId,
       matchId: message.matchId,
