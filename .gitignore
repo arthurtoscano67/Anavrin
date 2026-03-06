@@ -4,4 +4,5 @@ dist
 .vite
 .env
 .env.*
+!.env.production
 .DS_Store
