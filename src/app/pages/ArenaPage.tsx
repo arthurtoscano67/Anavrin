@@ -10,6 +10,7 @@ import { useLobby } from "../../hooks/useLobby";
 
 import { BattleArena } from "../components/BattleArena";
 import { LoadingGrid } from "../components/LoadingGrid";
+import { MonsterImage } from "../components/MonsterImage";
 import { PageShell } from "../components/PageShell";
 import { Spinner } from "../components/Spinner";
 import { useArenaMatches } from "../hooks/useArenaMatches";
@@ -20,13 +21,14 @@ import {
   PACKAGE_ID,
   TREASURY_ID,
 } from "../lib/constants";
-import { short, statusLabel, toMist, toSui } from "../lib/format";
+import { powerPreview, short, stageMeta, statusLabel, toMist, toSui } from "../lib/format";
 import { fetchArenaMatch, fetchMatchResolution, queryAllEvents } from "../lib/sui";
-import type { ArenaMatch, BattleOutcomeEvent, MatchResolution } from "../lib/types";
+import type { ArenaMatch, BattleOutcomeEvent, MatchResolution, Monster } from "../lib/types";
 import { useAnavrinData } from "../hooks/useAnavrinData";
 import { useTxExecutor } from "../hooks/useTxExecutor";
 
 const ACTIVE_ARENA_MATCH_STORAGE_KEY = "activeArenaMatch";
+const QUICK_STAKE_OPTIONS = ["0", "0.05", "0.10", "0.25", "0.50"];
 type MobileArenaSection = "lobby" | "flow" | "room" | "live" | "history";
 
 function includesPlayer(match: ArenaMatch, address?: string | null): boolean {
@@ -46,6 +48,53 @@ function preferMatch(matches: ArenaMatch[]): ArenaMatch | null {
 
 function isValidSuiAddress(input: string): boolean {
   return /^0x[0-9a-fA-F]{2,}$/.test(input.trim());
+}
+
+function ArenaLegendTile({
+  monster,
+  active,
+  locked,
+  onSelect,
+}: {
+  monster: Monster;
+  active: boolean;
+  locked?: boolean;
+  onSelect: () => void;
+}) {
+  const stage = stageMeta(monster.stage);
+  const power = powerPreview(monster);
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      disabled={locked}
+      className={`min-w-[174px] rounded-[28px] border p-3 text-left transition ${
+        active
+          ? "arena-ready-glow border-green-300/70 bg-gradient-to-br from-green-500/25 to-emerald-400/10"
+          : "border-white/10 bg-black/25 hover:border-cyan/40 hover:bg-cyan/10"
+      } ${locked ? "cursor-not-allowed opacity-60" : ""}`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-white/80">
+          {stage.label}
+        </span>
+        {active ? (
+          <span className="rounded-full bg-green-400 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-950">
+            Selected
+          </span>
+        ) : null}
+      </div>
+      <MonsterImage objectId={monster.objectId} monster={monster} className="mt-3 aspect-square h-28 w-full rounded-[24px] border border-white/10 bg-black/30" />
+      <div className="mt-3 text-lg font-black text-white">{monster.name}</div>
+      <div className="mt-1 text-xs text-cyan">Power {power}</div>
+      <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] font-semibold text-white/80">
+        <div className="rounded-2xl bg-white/5 px-2 py-2 text-center">ATK {monster.attack}</div>
+        <div className="rounded-2xl bg-white/5 px-2 py-2 text-center">DEF {monster.defense}</div>
+        <div className="rounded-2xl bg-white/5 px-2 py-2 text-center">SPD {monster.speed}</div>
+      </div>
+    </button>
+  );
 }
 
 export function ArenaPage() {
@@ -106,6 +155,12 @@ export function ArenaPage() {
       (walletMonsters.data ?? []).find((monster) => monster.objectId === createMonsterId) ??
       (walletMonsters.data ?? [])[0],
     [createMonsterId, walletMonsters.data]
+  );
+  const selectedArenaMonster = useMemo(
+    () =>
+      (walletMonsters.data ?? []).find((monster) => monster.objectId === (currentMatchId ? joinMonsterId : createMonsterId)) ??
+      null,
+    [createMonsterId, currentMatchId, joinMonsterId, walletMonsters.data]
   );
 
   const lobby = useLobby({
@@ -487,6 +542,7 @@ export function ArenaPage() {
 
   const onInvitePlayer = (to: string) => {
     setOpponent(to);
+    setMobileSection("flow");
     lobby.invitePlayer(to);
     toast.success(`Invite sent to ${short(to)}`);
   };
@@ -517,15 +573,21 @@ export function ArenaPage() {
     setOpponent(match.creator);
     setCreateStake(match.stakeSui || "0");
     setJoinStake(match.stakeSui || "0");
+    setMobileSection("flow");
     lobby.joinOpenMatch(match.id, match.creator);
     toast.success(`Challenge accepted: ${short(match.creator)}`);
   };
 
   const onAcceptLobbyInvite = (invite: LobbyInvite) => {
     setOpponent(invite.from);
+    setMobileSection("flow");
     lobby.acceptInvite(invite);
     toast.success(`Invite accepted: ${short(invite.from)}`);
   };
+
+  const onPracticeMode = useCallback(() => {
+    toast.error("Practice mode needs a contract update. Self-matches cannot fill side B yet.");
+  }, []);
 
   const onResetArenaFlow = () => {
     setOpponent("");
@@ -640,6 +702,8 @@ export function ArenaPage() {
               : "This room is live. Deposit your legend and matching wager to enter.";
   const selectedArenaMonsterId = currentMatchId ? joinMonsterId : createMonsterId;
   const selectedArenaStake = currentMatchId ? joinStake : createStake;
+  const selectedStakeValue = Number(selectedArenaStake || "0");
+  const selectedStakeLabel = Number.isFinite(selectedStakeValue) ? selectedStakeValue.toFixed(2) : "0.00";
   const canOpenRoom = Boolean(
     account &&
     opponent.trim() &&
@@ -648,15 +712,6 @@ export function ArenaPage() {
     !awaitingRoomCreation &&
     !lockCreateActions
   );
-  const openRoomButtonLabel = pending === "create"
-    ? "Opening Room..."
-    : awaitingRoomCreation
-      ? "Creating Room..."
-      : activeMatch
-        ? "Room Ready"
-        : opponent.trim()
-          ? "Open Battle Room"
-          : "Invite A Trainer";
   const mobileSectionButtons = [
     { id: "lobby", label: "Lobby", ref: lobbySectionRef },
     { id: "flow", label: "Flow", ref: flowSectionRef },
@@ -856,126 +911,157 @@ export function ArenaPage() {
               </div>
             </div>
 
-            <div className="mt-4 rounded-[22px] border border-cyan/30 bg-cyan/10 p-4 md:hidden">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan/80">Next step</div>
-              <div className="mt-2 flex items-start gap-3">
-                <div className="text-2xl">{currentCoachStep.icon}</div>
-                <div className="min-w-0">
-                  <div className="text-base font-bold text-white">{currentCoachStep.title}</div>
-                  <p className="mt-1 text-sm leading-6 text-gray-200">{currentCoachStep.help}</p>
+            <div className="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">
+              {coachSteps.map((step) => (
+                <div
+                  key={step.id}
+                  className={`min-w-[140px] rounded-full border px-4 py-3 text-sm font-bold transition ${
+                    step.current
+                      ? "border-cyan/50 bg-cyan/20 text-cyan shadow-[0_0_28px_rgba(6,182,212,0.14)]"
+                      : step.done
+                        ? "border-green-400/45 bg-green-500/15 text-green-100"
+                        : "border-white/10 bg-black/20 text-gray-200"
+                  }`}
+                >
+                  <span className="mr-2 text-lg">{step.icon}</span>
+                  {step.title}
                 </div>
-              </div>
+              ))}
             </div>
 
-            <div className="mt-4 grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
-              <div className="rounded-[24px] border border-white/10 bg-black/20 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gray-400">Quick setup</div>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-xs text-gray-400">Your legend</label>
-                    <select
-                      className="input min-h-12"
-                      value={selectedArenaMonsterId}
-                      onChange={(e) => setArenaMonster(e.target.value)}
-                      disabled={pending !== null || recoveringMatch || userHasDeposited}
-                    >
-                      <option value="">Select legend</option>
-                      {(walletMonsters.data ?? []).map((monster) => (
-                        <option value={monster.objectId} key={monster.objectId}>
-                          {monster.name} ({short(monster.objectId)})
-                        </option>
-                      ))}
-                    </select>
+            <div className="mt-4 grid gap-4 xl:grid-cols-[1.3fr_0.9fr]">
+              <div className="rounded-[28px] border border-white/10 bg-black/20 p-4 sm:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-black uppercase tracking-[0.26em] text-cyan/80">1. Tap your legend</div>
+                    <div className="mt-1 text-2xl font-black text-white">Pick a monster card</div>
                   </div>
+                  <div className="rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm font-bold text-white">
+                    {selectedArenaMonster ? `${selectedArenaMonster.name} • ${selectedStakeLabel} SUI` : "No legend yet"}
+                  </div>
+                </div>
 
-                  <div className="space-y-2">
-                    <label className="text-xs text-gray-400">Wager (SUI)</label>
+                {walletMonsters.isLoading ? (
+                  <div className="mt-4">
+                    <LoadingGrid count={2} />
+                  </div>
+                ) : !walletMonsters.data?.length ? (
+                  <div className="mt-4 rounded-[24px] border border-white/10 bg-white/5 px-4 py-6 text-center text-sm text-gray-300">
+                    Mint a legend first, then come back and tap it here.
+                  </div>
+                ) : (
+                  <div className="no-scrollbar mt-4 flex gap-3 overflow-x-auto pb-2">
+                    {(walletMonsters.data ?? []).map((monster) => (
+                      <ArenaLegendTile
+                        key={monster.objectId}
+                        monster={monster}
+                        active={monster.objectId === selectedArenaMonsterId}
+                        locked={pending !== null || recoveringMatch || userHasDeposited}
+                        onSelect={() => setArenaMonster(monster.objectId)}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                <div className="mt-5">
+                  <div className="text-[11px] font-black uppercase tracking-[0.26em] text-orange-200">2. Tap your wager</div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {QUICK_STAKE_OPTIONS.map((stake) => (
+                      <button
+                        key={stake}
+                        type="button"
+                        className={`rounded-full border px-4 py-3 text-sm font-black transition ${
+                          selectedArenaStake === stake
+                            ? "border-amber-300 bg-amber-400 text-slate-950"
+                            : "border-white/10 bg-white/5 text-white hover:border-amber-300/60 hover:bg-amber-400/15"
+                        }`}
+                        onClick={() => setArenaStake(stake)}
+                        disabled={pending !== null || recoveringMatch || userHasDeposited}
+                      >
+                        {stake} SUI
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-3 max-w-[180px]">
+                    <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Custom</label>
                     <input
                       className="input min-h-12"
-                      placeholder="0.0"
+                      placeholder="0.00"
                       value={selectedArenaStake}
                       onChange={(e) => setArenaStake(e.target.value)}
                       disabled={pending !== null || recoveringMatch || userHasDeposited}
                     />
                   </div>
                 </div>
-
-                <div className="mt-3 rounded-[20px] border border-white/8 bg-white/5 px-3 py-3 text-sm text-gray-300">
-                  {activeMatch
-                    ? "Room loaded. Ready up from the buttons below when your legend and wager look right."
-                    : opponent.trim()
-                      ? `Opponent locked: ${short(opponent)}`
-                      : "Pick a trainer from the lobby to auto-fill the opponent."}
-                </div>
               </div>
 
-              <div className="grid gap-3">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
                 <button
-                  className="btn-primary min-h-14 text-base"
-                  onClick={onCreateMatch}
-                  disabled={!canOpenRoom || pending !== null || recoveringMatch}
-                >
-                  {openRoomButtonLabel}
-                </button>
-                <button
-                  className="btn-ghost min-h-14 text-base"
+                  type="button"
+                  className="min-h-[84px] rounded-[28px] border border-green-300/50 bg-gradient-to-br from-green-500 to-emerald-400 p-5 text-left text-slate-950 shadow-[0_18px_40px_rgba(34,197,94,0.28)] transition hover:scale-[1.01]"
                   onClick={() => {
                     setMobileSection("lobby");
                     scrollToSection(lobbySectionRef);
                   }}
                 >
-                  Browse Lobby
+                  <div className="text-3xl">👥</div>
+                  <div className="mt-3 text-2xl font-black">{opponent.trim() ? "Change Friend" : "Invite Friend"}</div>
+                  <div className="mt-1 text-sm font-semibold">{opponent.trim() ? short(opponent) : "Tap a trainer card"}</div>
+                </button>
+
+                <button
+                  type="button"
+                  className="min-h-[84px] rounded-[28px] border border-cyan/50 bg-gradient-to-br from-cyan/40 to-sky-500/40 p-5 text-left text-white shadow-[0_18px_40px_rgba(6,182,212,0.18)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={onCreateMatch}
+                  disabled={!canOpenRoom || pending !== null || recoveringMatch}
+                >
+                  <div className="text-3xl">🏟️</div>
+                  <div className="mt-3 text-2xl font-black">{activeMatch ? "Room Ready" : opponent.trim() ? "Make Room!" : "Pick Friend First"}</div>
+                  <div className="mt-1 text-sm font-semibold">
+                    {pending === "create" ? "Opening on-chain room..." : currentCoachStep.help}
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  className="min-h-[84px] rounded-[28px] border border-blue-300/40 bg-gradient-to-br from-blue-500/35 to-indigo-500/35 p-5 text-left text-white transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => onCreateOpenLobbyMatch(selectedArenaStake || "0")}
+                  disabled={!account || !createMonsterId || pending !== null || recoveringMatch || lockCreateActions}
+                >
+                  <div className="text-3xl">🌐</div>
+                  <div className="mt-3 text-2xl font-black">Post Open Match</div>
+                  <div className="mt-1 text-sm font-semibold">Let anyone online jump in.</div>
+                </button>
+
+                <button
+                  type="button"
+                  className="min-h-[84px] rounded-[28px] border border-white/10 bg-white/5 p-5 text-left text-white/85 transition hover:border-white/20 hover:bg-white/10"
+                  onClick={onPracticeMode}
+                >
+                  <div className="text-3xl">🪞</div>
+                  <div className="mt-3 text-2xl font-black">Practice Soon</div>
+                  <div className="mt-1 text-sm font-semibold">Needs a contract patch for self-vs-self.</div>
                 </button>
               </div>
             </div>
 
-            <div className="no-scrollbar mt-4 hidden gap-3 overflow-x-auto pb-1 md:flex">
-              {coachSteps.map((step) => (
-                <div
-                  key={step.id}
-                  className={`min-w-[168px] rounded-[22px] border p-3 text-left transition ${
-                    step.current
-                      ? "border-cyan/50 bg-cyan/20 text-cyan shadow-[0_0_28px_rgba(6,182,212,0.14)]"
-                      : step.done
-                        ? "border-green-400/45 bg-green-500/15 text-green-200"
-                        : "border-white/10 bg-black/20 text-gray-200"
-                  }`}
-                >
-                  <div className="text-2xl">{step.icon}</div>
-                  <div className="mt-3 text-sm font-bold">{step.title}</div>
-                  <div className="mt-1 text-xs leading-5 text-gray-300">{step.help}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-[22px] border border-cyan/35 bg-cyan/10 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan/80">Your next move</div>
+            <div className="mt-4 grid gap-3 md:grid-cols-[1.1fr_0.9fr]">
+              <div className="rounded-[24px] border border-cyan/35 bg-cyan/10 p-4">
+                <div className="text-[11px] font-black uppercase tracking-[0.24em] text-cyan/80">Next tap</div>
                 <div className="mt-3 flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-cyan/20 text-xl">🕹️</div>
-                  <p className="text-sm leading-6 text-white">{yourNextAction}</p>
+                  <div className="text-3xl">{currentCoachStep.icon}</div>
+                  <div className="min-w-0">
+                    <div className="text-xl font-black text-white">{currentCoachStep.title}</div>
+                    <p className="mt-1 text-sm leading-6 text-white/90">{yourNextAction}</p>
+                  </div>
                 </div>
               </div>
-              <div className="rounded-[22px] border border-purple/35 bg-purple/10 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-purple-100">Opponent status</div>
-                <div className="mt-3 flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-purple/20 text-xl">👀</div>
-                  <p className="text-sm leading-6 text-white">{opponentNextAction}</p>
-                </div>
+              <div className="rounded-[24px] border border-purple/35 bg-purple/10 p-4">
+                <div className="text-[11px] font-black uppercase tracking-[0.24em] text-purple-100">Other side</div>
+                <div className="mt-3 text-xl font-black text-white">{opponent.trim() ? short(opponent) : "Nobody yet"}</div>
+                <p className="mt-2 text-sm leading-6 text-white/90">{opponentNextAction}</p>
               </div>
             </div>
-
-            <details className="mt-4 hidden rounded-[22px] border border-white/10 bg-black/20 px-4 py-3 text-sm text-gray-300 md:block">
-              <summary className="cursor-pointer font-semibold text-white">
-                Tap for simple instructions
-              </summary>
-              <div className="mt-3 grid gap-2 sm:grid-cols-4">
-                <div className="rounded-2xl border border-white/8 bg-white/5 p-3">1. See a trainer in the lobby.</div>
-                <div className="rounded-2xl border border-white/8 bg-white/5 p-3">2. Send or accept an invite.</div>
-                <div className="rounded-2xl border border-white/8 bg-white/5 p-3">3. Ready up by depositing your legend.</div>
-                <div className="rounded-2xl border border-white/8 bg-white/5 p-3">4. When both say Ready, start the battle.</div>
-              </div>
-            </details>
           </div>
 
           <div
@@ -986,14 +1072,12 @@ export function ArenaPage() {
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.26em] text-cyan/80">Ready Room</div>
                 <h3 className="mt-1 text-2xl font-black tracking-tight text-white">Battle Board</h3>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-300">
-                  This room updates live from Sui. Both trainers can see when the other legend is ready.
-                </p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-300">Left legend, right legend, then smash battle.</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 {inviteUrl ? (
                   <button
-                    className="btn-ghost text-xs"
+                    className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white transition hover:border-cyan/40 hover:bg-cyan/10"
                     onClick={async () => {
                       await navigator.clipboard.writeText(inviteUrl);
                       toast.success("Invite link copied");
@@ -1003,14 +1087,14 @@ export function ArenaPage() {
                   </button>
                 ) : null}
                 <button
-                  className="btn-ghost text-xs"
+                  className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white transition hover:border-cyan/40 hover:bg-cyan/10"
                   disabled={!currentMatchId || pending !== null || recoveringMatch}
                   onClick={() => loadMatch(currentMatchId)}
                 >
                   {pending === "load" ? "Syncing..." : "Refresh"}
                 </button>
                 <button
-                  className="btn-ghost text-xs"
+                  className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white transition hover:border-red-300/60 hover:bg-red-500/10"
                   onClick={onResetArenaFlow}
                   disabled={pending !== null || recoveringMatch}
                 >
@@ -1029,14 +1113,14 @@ export function ArenaPage() {
               </div>
               <div className="rounded-[22px] border border-cyan/25 bg-cyan/10 p-4">
                 <div className="text-[11px] uppercase tracking-[0.24em] text-cyan/80">You</div>
-                <div className="mt-2 text-lg font-bold text-white">{userHasDeposited ? "Ready" : "Not ready"}</div>
+                <div className="mt-2 text-lg font-bold text-white">{userHasDeposited ? "READY!" : "Pick + Send"}</div>
                 <div className="mt-1 text-xs text-gray-300">
                   {userHasDeposited ? "Your legend and wager are locked in." : "Deposit to show Ready."}
                 </div>
               </div>
               <div className="rounded-[22px] border border-purple/25 bg-purple/10 p-4">
                 <div className="text-[11px] uppercase tracking-[0.24em] text-purple-100">Opponent</div>
-                <div className="mt-2 text-lg font-bold text-white">{opponentHasDeposited ? "Ready" : "Waiting"}</div>
+                <div className="mt-2 text-lg font-bold text-white">{opponentHasDeposited ? "READY!" : "Waiting..."}</div>
                 <div className="mt-1 text-xs text-gray-300">
                   {opponentHasDeposited ? "Their legend is in the room." : "They still need to deposit."}
                 </div>
@@ -1069,25 +1153,25 @@ export function ArenaPage() {
 
                 <div className="grid gap-3 sm:grid-cols-3">
                   <button
-                    className="btn-primary min-h-14 text-base"
+                    className="min-h-[84px] rounded-[28px] border border-green-300/55 bg-gradient-to-br from-green-500 to-emerald-400 px-4 text-lg font-black text-slate-950 shadow-[0_18px_40px_rgba(34,197,94,0.3)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={onJoinMatch}
                     disabled={!account || !joinMatchId || pending !== null || recoveringMatch || userHasDeposited}
                   >
                     {pending === "join"
                       ? <span className="inline-flex items-center gap-2"><Spinner /> Readying...</span>
                       : userHasDeposited
-                        ? "Legend Ready"
-                        : "Ready Up Legend"}
+                        ? "READY!"
+                        : "Send Legend!"}
                   </button>
                   <button
-                    className="btn-secondary min-h-14 text-base"
+                    className={`min-h-[84px] rounded-[28px] border border-red-300/60 bg-gradient-to-br from-red-500 to-rose-500 px-4 text-lg font-black text-white shadow-[0_18px_40px_rgba(239,68,68,0.25)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50 ${canStartBattle ? "arena-battle-shake" : ""}`}
                     onClick={onStartBattle}
                     disabled={!canStartBattle || pending !== null || recoveringMatch}
                   >
                     {pending === "battle" ? <span className="inline-flex items-center gap-2"><Spinner /> Resolving...</span> : "Start Battle"}
                   </button>
                   <button
-                    className="btn-ghost min-h-14 text-base"
+                    className="min-h-[84px] rounded-[28px] border border-red-300/40 bg-red-500/10 px-4 text-lg font-black text-red-100 transition hover:border-red-300/60 hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={onWithdraw}
                     disabled={!canWithdraw || pending !== null || recoveringMatch}
                   >
@@ -1095,13 +1179,12 @@ export function ArenaPage() {
                   </button>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-[22px] border border-white/10 bg-black/20 p-4 text-sm text-gray-300">
-                    Wager is locked at the moment you ready up. If your opponent disappears before the room locks, use Withdraw & Leave.
-                  </div>
-                  <div className="rounded-[22px] border border-white/10 bg-black/20 p-4 text-sm text-gray-300">
-                    Anyone can load the room by ID to spectate. Battles settle on-chain and feed the leaderboard.
-                  </div>
+                <div className="rounded-[24px] border border-white/10 bg-black/20 p-4 text-sm font-semibold text-gray-200">
+                  {bothDeposited
+                    ? "Both legends are glowing. Anyone can press BATTLE."
+                    : userHasDeposited
+                      ? "You are ready. Wait for the other side, or leave if they disappear."
+                      : "Tap Send Legend! when you like your monster and wager."}
                 </div>
               </div>
             )}
@@ -1112,7 +1195,7 @@ export function ArenaPage() {
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div>
                     <div className="text-xs text-gray-300">Winner</div>
-                    <div className="font-semibold text-green-300">{short(resolution.winner)}</div>
+                    <div className="arena-win-pulse text-2xl font-black text-green-300">{short(resolution.winner)}</div>
                     <div className="text-xs text-gray-400">Monster {short(resolution.winnerMonsterId)}</div>
                   </div>
                   <div>

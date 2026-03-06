@@ -27,11 +27,10 @@ export function BattleArena({
             Ready Room
           </div>
           <h2 className="mt-5 text-3xl font-black tracking-tight text-white sm:text-4xl">
-            Invite a trainer and lock in your legend.
+            Pick legends. Tap ready. Smash battle.
           </h2>
           <p className="mt-3 max-w-xl text-sm leading-6 text-gray-300 sm:text-base">
-            The arena wakes up when both players accept, deposit their legends, and match the wager.
-            Then either trainer can start the battle.
+            The room wakes up after both sides send a legend and matching wager.
           </p>
 
           <div className="mt-8 grid w-full grid-cols-3 gap-2 sm:gap-3">
@@ -68,12 +67,12 @@ export function BattleArena({
         ? `${monsterBName} is ready`
         : `${monsterAName} vs ${monsterBName}`;
   const helperText = match.status === 2
-    ? "Battle finished. Scroll down to see the winner and payout."
+    ? "Battle finished. Winner is below."
     : match.status === 3
-      ? "This room was cancelled and all legends were returned."
+      ? "Cancelled. Everyone got their legend back."
       : isReadyRoom
-        ? "Both trainers can watch the room update live. Deposit your legend and matching wager to show Ready."
-        : "Both legends are ready. Anyone in the room can start the battle now.";
+        ? "Send a legend to light up your side."
+        : "Both sides are ready. Anyone can press battle.";
 
   return (
     <section className="arena-stage overflow-hidden rounded-[32px] border border-purple/30 p-4 md:p-6">

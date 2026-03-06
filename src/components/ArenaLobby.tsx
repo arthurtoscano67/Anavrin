@@ -86,12 +86,12 @@ export function ArenaLobby({
   };
 
   return (
-    <aside className="glass-card space-y-4 overflow-hidden border-purple/30 bg-gradient-to-br from-surface via-[#121629] to-[#101a28] p-4 lg:sticky lg:top-24">
+    <aside className="glass-card space-y-5 overflow-hidden border-cyan/25 bg-gradient-to-br from-[#10172c] via-[#11152a] to-[#171236] p-4 lg:sticky lg:top-24">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-[11px] uppercase tracking-[0.24em] text-cyan/75">Arena Lobby</div>
-          <h3 className="mt-2 text-2xl font-black tracking-tight text-white">Pick a trainer, invite, battle.</h3>
-          <p className="mt-1 text-sm text-gray-300">Mobile flow: invite, accept, ready up, then either player can start.</p>
+          <h3 className="mt-2 text-3xl font-black tracking-tight text-white">Tap a trainer.</h3>
+          <p className="mt-1 text-sm font-semibold text-gray-300">Invite. Accept. Ready. Battle.</p>
         </div>
         <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${statusOpen ? "border-green-400/35 bg-green-500/10 text-green-200" : connectionTone(connectionState)}`}>
           {statusOpen ? "Open" : "Closed"}
@@ -107,20 +107,20 @@ export function ArenaLobby({
       )}
 
       <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-        <div className="rounded-[24px] border border-cyan/25 bg-cyan/10 p-4">
-          <div className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan/80">Quick Post</div>
-          <div className="mt-2 text-lg font-bold text-white">Create an open room</div>
-          <p className="mt-1 text-sm text-gray-300">Post a wager and let any online trainer jump in.</p>
+        <div className="rounded-[28px] border border-cyan/30 bg-gradient-to-br from-cyan/20 to-sky-500/10 p-5">
+          <div className="text-xs font-black uppercase tracking-[0.24em] text-cyan/80">Quick Post</div>
+          <div className="mt-2 text-2xl font-black text-white">Open Battle Room</div>
+          <p className="mt-1 text-sm font-semibold text-white/85">Set a wager. Wait for a challenger.</p>
         </div>
         <div className="grid gap-2 sm:w-[220px]">
           <input
-            className="input"
+            className="input min-h-12"
             placeholder="Wager in SUI"
             value={stakeInput}
             onChange={(event) => setStakeInput(event.target.value)}
           />
-          <button className="btn-secondary min-h-14 text-base" onClick={submitOpenMatch} disabled={!isConnected || busy}>
-            Post Open Match
+          <button className="min-h-[72px] rounded-[24px] border border-blue-300/50 bg-gradient-to-br from-blue-500 to-cyan-400 text-lg font-black text-white shadow-[0_16px_32px_rgba(59,130,246,0.25)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50" onClick={submitOpenMatch} disabled={!isConnected || busy}>
+            Post Match!
           </button>
         </div>
       </div>
@@ -129,7 +129,7 @@ export function ArenaLobby({
         <div className="flex items-center justify-between gap-2">
           <div>
             <div className="text-[11px] uppercase tracking-[0.24em] text-gray-400">Online Trainers</div>
-            <div className="mt-1 text-lg font-bold text-white">Tap a trainer to send an invite</div>
+            <div className="mt-1 text-xl font-black text-white">Tap to invite</div>
           </div>
           <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-gray-200">
             {visiblePlayers.length}
@@ -143,37 +143,37 @@ export function ArenaLobby({
           </div>
         ) : visiblePlayers.length === 0 ? (
           <div className="rounded-[24px] border border-borderSoft bg-black/20 p-4 text-sm text-gray-400">
-            Waiting for trainers to come online.
+            No trainers yet.
           </div>
         ) : (
           <div className="no-scrollbar flex snap-x gap-3 overflow-x-auto pb-1">
             {visiblePlayers.map((player) => (
               <article
                 key={player.address}
-                className="min-w-[255px] snap-start rounded-[26px] border border-white/8 bg-black/20 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.28)]"
+                className="min-w-[255px] snap-start rounded-[30px] border border-white/8 bg-black/20 p-4 shadow-[0_16px_40px_rgba(0,0,0,0.28)]"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-purple to-cyan text-sm font-black text-white">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-gradient-to-br from-purple to-cyan text-base font-black text-white">
                     {trainerBadge(player.address)}
                   </div>
                   <div>
-                    <div className="text-sm font-bold text-white">{short(player.address)}</div>
-                    <div className="text-xs text-gray-400">Online now</div>
+                    <div className="text-base font-black text-white">{short(player.address)}</div>
+                    <div className="text-xs font-semibold text-gray-400">Online now</div>
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-[22px] border border-white/8 bg-white/5 p-3">
-                  <div className="text-xs uppercase tracking-[0.2em] text-gray-400">Selected Legend</div>
-                  <div className="mt-2 text-lg font-bold text-white">{player.monsterName}</div>
-                  <div className="mt-1 text-sm text-cyan">Level {player.level}</div>
+                <div className="mt-4 rounded-[24px] border border-white/8 bg-white/5 p-4">
+                  <div className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">Legend</div>
+                  <div className="mt-2 text-2xl font-black text-white">{player.monsterName}</div>
+                  <div className="mt-1 text-sm font-semibold text-cyan">Level {player.level}</div>
                 </div>
 
                 <button
-                  className="btn-primary mt-4 min-h-14 w-full text-base"
+                  className="mt-4 min-h-[76px] w-full rounded-[24px] border border-green-300/50 bg-gradient-to-br from-green-500 to-emerald-400 text-xl font-black text-slate-950 shadow-[0_18px_40px_rgba(34,197,94,0.25)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => onInvite(player.address)}
                   disabled={!isConnected || busy}
                 >
-                  Invite To Battle
+                  Invite!
                 </button>
               </article>
             ))}
@@ -184,38 +184,38 @@ export function ArenaLobby({
       <section className="grid gap-3 lg:grid-cols-2">
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <div>
-              <div className="text-[11px] uppercase tracking-[0.24em] text-gray-400">Invites</div>
-              <div className="mt-1 text-lg font-bold text-white">Accept and enter the ready room</div>
-            </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.24em] text-gray-400">Invites</div>
+            <div className="mt-1 text-xl font-black text-white">Accept and go</div>
+          </div>
             <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-gray-200">
               {incomingInvites.length}
             </span>
           </div>
 
           {incomingInvites.length === 0 ? (
-            <div className="rounded-[24px] border border-borderSoft bg-black/20 p-4 text-sm text-gray-400">
-              No pending invites.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {incomingInvites.map((invite) => (
-                <article key={invite.id} className="rounded-[24px] border border-purple/30 bg-purple/10 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-bold text-white">{short(invite.from)} wants to battle</div>
-                      <div className="mt-1 text-sm text-gray-300">{invite.monsterName} • Level {invite.level}</div>
-                    </div>
-                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-purple-100">
+          <div className="rounded-[24px] border border-borderSoft bg-black/20 p-4 text-sm text-gray-400">
+            No invites waiting.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {incomingInvites.map((invite) => (
+              <article key={invite.id} className="rounded-[28px] border border-purple/30 bg-gradient-to-br from-purple/20 to-pink-500/10 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-lg font-black text-white">{short(invite.from)} wants in</div>
+                    <div className="mt-1 text-sm font-semibold text-gray-300">{invite.monsterName} • Level {invite.level}</div>
+                  </div>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-black text-purple-100">
                       Invite
                     </span>
                   </div>
                   <button
-                    className="btn-primary mt-4 min-h-14 w-full text-base"
+                    className="mt-4 min-h-[76px] w-full rounded-[24px] border border-green-300/50 bg-gradient-to-br from-green-500 to-emerald-400 text-xl font-black text-slate-950 shadow-[0_18px_40px_rgba(34,197,94,0.25)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={() => onAcceptInvite(invite)}
                     disabled={!isConnected || busy}
                   >
-                    Accept Invite
+                    Accept!
                   </button>
                 </article>
               ))}
@@ -225,38 +225,38 @@ export function ArenaLobby({
 
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <div>
-              <div className="text-[11px] uppercase tracking-[0.24em] text-gray-400">Open Matches</div>
-              <div className="mt-1 text-lg font-bold text-white">Join a public battle room</div>
-            </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.24em] text-gray-400">Open Matches</div>
+            <div className="mt-1 text-xl font-black text-white">Jump into a room</div>
+          </div>
             <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-gray-200">
               {visibleMatches.length}
             </span>
           </div>
 
           {visibleMatches.length === 0 ? (
-            <div className="rounded-[24px] border border-borderSoft bg-black/20 p-4 text-sm text-gray-400">
-              No open battles yet.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {visibleMatches.map((match) => (
-                <article key={match.id} className="rounded-[24px] border border-cyan/25 bg-cyan/10 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-bold text-white">{match.creatorMonster} waiting</div>
-                      <div className="mt-1 text-sm text-gray-300">{short(match.creator)} • Wager {match.stakeSui || "0"} SUI</div>
-                    </div>
-                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-cyan">
+          <div className="rounded-[24px] border border-borderSoft bg-black/20 p-4 text-sm text-gray-400">
+            No open rooms.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {visibleMatches.map((match) => (
+              <article key={match.id} className="rounded-[28px] border border-cyan/25 bg-gradient-to-br from-cyan/20 to-blue-500/10 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-lg font-black text-white">{match.creatorMonster}</div>
+                    <div className="mt-1 text-sm font-semibold text-gray-300">{short(match.creator)} • {match.stakeSui || "0"} SUI</div>
+                  </div>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-black text-cyan">
                       Open
                     </span>
                   </div>
                   <button
-                    className="btn-secondary mt-4 min-h-14 w-full text-base"
+                    className="mt-4 min-h-[76px] w-full rounded-[24px] border border-cyan/50 bg-gradient-to-br from-cyan-400 to-blue-500 text-xl font-black text-slate-950 shadow-[0_18px_40px_rgba(6,182,212,0.25)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={() => onJoinOpenMatch(match)}
                     disabled={!isConnected || busy}
                   >
-                    Join Match
+                    Join!
                   </button>
                 </article>
               ))}
@@ -269,14 +269,14 @@ export function ArenaLobby({
         <div className="text-[11px] uppercase tracking-[0.24em] text-gray-400">Recent Lobby Activity</div>
         {recentMatches.length === 0 ? (
           <div className="rounded-[24px] border border-borderSoft bg-black/20 p-4 text-sm text-gray-400">
-            No recent lobby activity.
+            No recent fights.
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
             {recentMatches.slice(0, 4).map((entry) => (
-              <article key={entry.id} className="rounded-[22px] border border-white/8 bg-white/5 p-4">
-                <div className="text-sm font-semibold text-white">{entry.summary}</div>
-                <div className="mt-2 text-xs text-gray-500">{formatWhen(entry.timestamp)}</div>
+              <article key={entry.id} className="rounded-[24px] border border-white/8 bg-white/5 p-4">
+                <div className="text-base font-black text-white">{entry.summary}</div>
+                <div className="mt-2 text-xs font-semibold text-gray-500">{formatWhen(entry.timestamp)}</div>
               </article>
             ))}
           </div>
