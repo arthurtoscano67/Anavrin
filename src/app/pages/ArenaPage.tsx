@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCurrentAccount, useSuiClient } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { ArenaLobby } from "../../components/ArenaLobby";
@@ -9,6 +9,7 @@ import type { LobbyInvite, LobbyOpenMatch } from "../../hooks/useLobby";
 import { useLobby } from "../../hooks/useLobby";
 
 import { LoadingGrid } from "../components/LoadingGrid";
+import { MonsterImage } from "../components/MonsterImage";
 import { PageShell } from "../components/PageShell";
 import { Spinner } from "../components/Spinner";
 import {
@@ -18,7 +19,7 @@ import {
   PACKAGE_ID,
   TREASURY_ID,
 } from "../lib/constants";
-import { short, statusLabel, toMist, toSui } from "../lib/format";
+import { short, stageMeta, statusLabel, toMist, toSui } from "../lib/format";
 import { fetchArenaMatch, fetchMatchResolution } from "../lib/sui";
 import type { ArenaMatch, BattleOutcomeEvent, MatchResolution } from "../lib/types";
 import { useAnavrinData } from "../hooks/useAnavrinData";
@@ -300,6 +301,27 @@ export function ArenaPage() {
     }
   };
 
+  const onWithdraw = async () => {
+    if (!currentMatchId) {
+      toast.error("Load a match first");
+      return;
+    }
+
+    setPending("withdraw");
+    try {
+      const tx = new Transaction();
+      tx.moveCall({
+        target: `${PACKAGE_ID}::${MODULE}::withdraw`,
+        arguments: [tx.object(currentMatchId)],
+      });
+      await execute(tx, "Withdraw complete");
+      await walletMonsters.refetch();
+      await loadMatch(currentMatchId);
+    } finally {
+      setPending(null);
+    }
+  };
+
   const inviteUrl = useMemo(() => {
     if (!currentMatchId || typeof window === "undefined") return "";
     return `${window.location.origin}/arena?match=${currentMatchId}`;
@@ -352,6 +374,54 @@ export function ArenaPage() {
     activeMatch.status === 1 &&
     account &&
     (account.address === activeMatch.player_a || account.address === activeMatch.player_b);
+  const isPlayerInMatch =
+    activeMatch &&
+    account &&
+    (account.address === activeMatch.player_a || account.address === activeMatch.player_b);
+  const canWithdraw =
+    activeMatch &&
+    activeMatch.status === 0 &&
+    isPlayerInMatch;
+
+  const monsterMap = useMemo(
+    () => new Map((walletMonsters.data ?? []).map((monster) => [monster.objectId, monster])),
+    [walletMonsters.data]
+  );
+
+  const sideA = activeMatch
+    ? {
+        address: activeMatch.player_a,
+        monsterId: activeMatch.mon_a ?? undefined,
+        stake: activeMatch.stake_a,
+      }
+    : null;
+  const sideB = activeMatch
+    ? {
+        address: activeMatch.player_b,
+        monsterId: activeMatch.mon_b ?? undefined,
+        stake: activeMatch.stake_b,
+      }
+    : null;
+
+  const localBattleFeed = useMemo(() => {
+    const chainEvents = (recentMatches.data ?? []).slice(0, 6).map((match) => ({
+      id: match.objectId,
+      summary: `${short(match.player_a)} vs ${short(match.player_b)} • ${statusLabel(match.status)}`,
+      ts: Number(match.created_at || "0"),
+      onChain: true,
+      matchId: match.objectId,
+    }));
+    const lobbyEvents = lobby.recentMatches.slice(0, 6).map((event) => ({
+      id: event.id,
+      summary: event.summary,
+      ts: Number(event.timestamp || 0),
+      onChain: false,
+      matchId: "",
+    }));
+    return [...chainEvents, ...lobbyEvents]
+      .sort((a, b) => b.ts - a.ts)
+      .slice(0, 8);
+  }, [lobby.recentMatches, recentMatches.data]);
 
   return (
     <PageShell
@@ -486,9 +556,9 @@ export function ArenaPage() {
             </div>
           </div>
 
-          <div className="glass-card space-y-3 p-4">
+          <div className="glass-card space-y-4 p-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold">Match Status</h3>
+              <h3 className="text-lg font-bold">Battle Board</h3>
               <button
                 className="btn-ghost"
                 disabled={!currentMatchId || pending !== null}
@@ -498,35 +568,94 @@ export function ArenaPage() {
               </button>
             </div>
 
-            {!activeMatch && (
-              <div className="rounded-xl border border-borderSoft bg-black/20 p-4 text-sm text-gray-300">
-                Load a match to see deposits, lock state, and results.
+            {!activeMatch ? (
+              <div className="rounded-2xl border border-dashed border-borderSoft bg-black/20 px-4 py-8 text-center text-sm text-gray-300">
+                Load a match to populate both battle sides and show ready states.
               </div>
-            )}
+            ) : (
+              <div className="space-y-4">
+                <div className="rounded-3xl border border-purple/35 bg-gradient-to-br from-purple/20 via-surface to-cyan/10 p-4">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <span className="rounded-full border border-purple/40 bg-purple/25 px-3 py-1 text-xs font-semibold text-purple-100">
+                      {statusLabel(activeMatch.status)}
+                    </span>
+                    <span className="text-xs text-gray-300">Match {short(activeMatch.objectId)}</span>
+                  </div>
 
-            {activeMatch && (
-              <div className="space-y-3 text-sm">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-purple/40 bg-purple/20 px-2 py-1 text-xs font-semibold text-purple-200">
-                    {statusLabel(activeMatch.status)}
-                  </span>
-                  <span className="text-gray-400">Match: {short(activeMatch.objectId)}</span>
+                  <div className="grid items-center gap-3 md:grid-cols-[1fr_auto_1fr]">
+                    {[sideA, sideB].map((side, index) => {
+                      if (!side) return null;
+                      const isYou = account?.address === side.address;
+                      const isReady = Boolean(side.monsterId);
+                      const knownMonster = side.monsterId ? monsterMap.get(side.monsterId) : undefined;
+                      const stage = knownMonster ? stageMeta(knownMonster.stage) : null;
+
+                      return (
+                        <div
+                          key={side.address}
+                          className={`rounded-2xl border p-4 ${
+                            isReady
+                              ? "border-cyan/40 bg-black/30 shadow-[0_0_20px_rgba(6,182,212,0.14)]"
+                              : "border-borderSoft bg-black/20"
+                          }`}
+                        >
+                          <div className="mb-2 flex items-center justify-between text-xs">
+                            <span className="font-semibold text-gray-200">
+                              {index === 0 ? "Left Side" : "Right Side"} {isYou ? "• You" : ""}
+                            </span>
+                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${isReady ? "bg-green-500/20 text-green-300" : "bg-yellow-500/20 text-yellow-300"}`}>
+                              {isReady ? "Ready" : "Waiting"}
+                            </span>
+                          </div>
+
+                          <div className="mb-2 font-semibold text-white">{short(side.address)}</div>
+                          {side.monsterId ? (
+                            <div className="grid gap-2">
+                              <MonsterImage objectId={side.monsterId} className="mx-auto aspect-square h-28 w-28 border border-borderSoft" />
+                              <div className="text-center text-sm font-semibold text-gray-100">
+                                {knownMonster?.name ?? `Legend ${short(side.monsterId)}`}
+                              </div>
+                              <div className="text-center text-xs text-cyan">Stake {toSui(side.stake)} SUI</div>
+                              {stage ? (
+                                <div className={`mx-auto rounded-full border px-2 py-0.5 text-[11px] font-semibold ${stage.color}`}>
+                                  {stage.emoji} {stage.label}
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <div className="rounded-xl border border-dashed border-borderSoft bg-black/20 px-3 py-5 text-center text-xs text-gray-400">
+                              Legend not deposited yet
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-legendGold/50 bg-legendGold/15 text-lg font-black text-legendGold">
+                      VS
+                    </div>
+                  </div>
                 </div>
 
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <div className="rounded-xl border border-borderSoft bg-black/20 p-3">
-                    <div className="text-xs text-gray-400">Player A</div>
-                    <div className="font-semibold">{short(activeMatch.player_a)}</div>
-                    <div className="mt-1 text-xs text-gray-300">Monster: {short(activeMatch.mon_a)}</div>
-                    <div className="text-xs text-cyan">Stake: {toSui(activeMatch.stake_a)} SUI</div>
-                  </div>
-                  <div className="rounded-xl border border-borderSoft bg-black/20 p-3">
-                    <div className="text-xs text-gray-400">Player B</div>
-                    <div className="font-semibold">{short(activeMatch.player_b)}</div>
-                    <div className="mt-1 text-xs text-gray-300">Monster: {short(activeMatch.mon_b)}</div>
-                    <div className="text-xs text-cyan">Stake: {toSui(activeMatch.stake_b)} SUI</div>
-                  </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="btn-secondary"
+                    onClick={onWithdraw}
+                    disabled={!canWithdraw || pending !== null}
+                  >
+                    {pending === "withdraw" ? <span className="inline-flex items-center gap-2"><Spinner /> Withdrawing...</span> : "Withdraw (Before Lock)"}
+                  </button>
+                  <button
+                    className="btn-primary"
+                    onClick={onStartBattle}
+                    disabled={!canStartBattle || pending !== null}
+                  >
+                    {pending === "battle" ? <span className="inline-flex items-center gap-2"><Spinner /> Resolving...</span> : "Start Battle"}
+                  </button>
                 </div>
+                <p className="text-xs text-gray-400">
+                  If your opponent goes offline before both legends are deposited, use Withdraw to reclaim your monster and stake.
+                </p>
               </div>
             )}
 
@@ -566,26 +695,42 @@ export function ArenaPage() {
           </div>
 
           <div className="glass-card space-y-3 p-4">
-            <h3 className="text-lg font-bold">On-Chain Recent Matches</h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-lg font-bold">Recent Fights</h3>
+              <Link to="/leaderboard" className="btn-ghost text-xs">
+                Go To Leaderboard
+              </Link>
+            </div>
             {recentMatches.isLoading ? (
               <LoadingGrid count={2} />
-            ) : (recentMatches.data ?? []).length === 0 ? (
+            ) : localBattleFeed.length === 0 ? (
               <div className="text-sm text-gray-400">No recent matches found.</div>
             ) : (
               <div className="space-y-2">
-                {(recentMatches.data ?? []).slice(0, 8).map((m) => (
-                  <button
-                    key={m.objectId}
-                    className="w-full rounded-xl border border-borderSoft bg-black/20 px-3 py-2 text-left text-sm transition hover:border-purple/50"
-                    onClick={() => {
-                      setJoinMatchId(m.objectId);
-                      upsertMatchQueryParam(m.objectId);
-                      void loadMatch(m.objectId);
-                    }}
+                {localBattleFeed.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="w-full rounded-xl border border-borderSoft bg-black/20 px-3 py-2 text-left text-sm"
                   >
-                    <div className="font-semibold">{short(m.objectId)}</div>
-                    <div className="text-xs text-gray-400">{statusLabel(m.status)} • {short(m.player_a)} vs {short(m.player_b)}</div>
-                  </button>
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <div className="font-semibold">{entry.summary}</div>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${entry.onChain ? "bg-cyan/20 text-cyan" : "bg-purple/20 text-purple-200"}`}>
+                        {entry.onChain ? "On-chain" : "Lobby"}
+                      </span>
+                    </div>
+                    {entry.onChain && entry.matchId ? (
+                      <button
+                        className="btn-ghost text-xs"
+                        onClick={() => {
+                          setJoinMatchId(entry.matchId);
+                          upsertMatchQueryParam(entry.matchId);
+                          void loadMatch(entry.matchId);
+                        }}
+                      >
+                        Open Match
+                      </button>
+                    ) : null}
+                  </div>
                 ))}
               </div>
             )}
