@@ -289,3 +289,436 @@ Current prompt: make it so if you press 7 you can equip items like put on jacket
 ## TODO / next-agent suggestions
 - Add explicit unequip flows (hat/jacket off) if the user requests clothing toggles.
 - Optionally add on-screen mini labels for preview-facing mode near the furniture ghost.
+
+---
+
+Current prompt: Create a real-time multiplayer Arena Lobby for Anavrin Legends with Cloudflare Workers + Durable Objects + WebSockets, and integrate it into the React/Vite Arena page.
+
+## 2026-03-05 Update (Realtime Arena Lobby)
+- Implemented Cloudflare Worker + Durable Object backend:
+  - Added `workers/lobby-worker.ts` (routes `/lobby` WS upgrade traffic into Durable Object room).
+  - Added `workers/arena-lobby.ts` (`ArenaLobby` Durable Object) with:
+    - player presence tracking
+    - open match posting
+    - invite flow
+    - match-start signaling
+    - recent lobby activity feed
+    - lobby-state broadcast to all sockets
+- Hardened worker runtime behavior for production:
+  - sender/session validation for invite and match messages
+  - multi-tab presence safety (address state only removed when final session disconnects)
+  - ping/pong support and heartbeat touch updates
+- Added frontend lobby hook:
+  - `src/hooks/useLobby.ts`
+  - Handles websocket connect/reconnect, keepalive ping, join/leave messages, lobby state, invites, open matches, and pending match-start events.
+- Added lobby UI component:
+  - `src/components/ArenaLobby.tsx`
+  - Renders sections for online players, open matches, invites, and recent matches.
+  - Supports invite, open match post, join open match, and accept invite actions.
+- Integrated lobby into Arena page:
+  - Updated `src/app/pages/ArenaPage.tsx`
+  - New right-side lobby panel with existing on-chain create/join battle flow preserved.
+  - Lobby events now prefill opponent/stakes and announce on-chain match creation.
+  - Pending lobby match-start events route users into existing Arena flow state.
+
+## Verification
+- `npm run typecheck` ✅
+- `npm run lint` ✅
+- `npm run build` ✅
+
+## Notes
+- No Move contract changes were made.
+- Lobby is matchmaking/presence only; on-chain battle transactions still execute exclusively through existing Sui calls.
+
+## 2026-03-05 Update (Anavrin Legacy App Arena Lobby)
+- Added `src/anavrin/ArenaLobby.jsx` and connected it to `VITE_LOBBY_WS_URL` fallback (`wss://anavrin-lobby.YOUR_ACCOUNT.workers.dev/lobby`).
+- Integrated the new lobby into `src/anavrin/App.jsx` as a dedicated `Arena` tab.
+- Added on-chain match creation hook in the legacy app when an invite is accepted (`create_match` entry call).
+- Renamed key project naming from “Anavrin Monsters” to “Anavrin Legends” in:
+  - `src/lib/config.ts`
+  - `README.md`
+  - legacy NFT image alt text / branding in `src/anavrin/App.jsx`
+- Validation run:
+  - `npm run typecheck` ✅
+  - `npm run lint` ✅
+  - `npm run build` ✅
+
+## 2026-03-06 Update (Arena Mobile Navigation + Overflow Fix)
+- Tightened mobile arena layout in `src/app/pages/ArenaPage.tsx`:
+  - Added mobile section tabs (`Lobby`, `Flow`, `Room`, `Live`, `History`).
+  - Mobile now shows one section at a time instead of a full vertical stack.
+  - Auto-switches to `Room` when an active match or pending room exists.
+  - Added compact mobile next-step card and kept desktop coaching on `md+`.
+- Tightened mobile overflow handling in `src/app/styles.css`:
+  - Added `min-w-0` to glass cards.
+  - Added `min-width: 0` and `max-width: 100%` to `.input`.
+- Compacted the empty ready-room state in `src/app/components/BattleArena.tsx` so the no-match arena is shorter on phones.
+- Validation completed:
+  - `npm run typecheck`
+  - `npm run lint`
+  - `npm run build`
+  - Playwright skill client run against `/arena`
+  - Manual iPhone-sized Playwright screenshot check confirmed `scrollWidth === clientWidth === 390` with no horizontal overflow.
+
+## 2026-03-06 Update (Kid-Simple Arena Lobby Pass)
+- Reworked Arena flow into a tap-first layout:
+  - visual legend picker cards instead of select-first UX
+  - quick wager chips plus custom stake input
+  - large CTA buttons for invite, make room, post match, and battle
+  - simplified copy across flow, room, and lobby
+- Updated `src/components/ArenaLobby.tsx` to use larger, friendlier cards/buttons for invites and open matches.
+- Updated `src/app/components/BattleArena.tsx` to shorten empty-state and battle helper copy.
+- Added Arena-specific animation helpers in `src/app/styles.css` (`arena-ready-glow`, `arena-battle-shake`, `arena-win-pulse`).
+- Important contract limitation: true self-battle / practice mode cannot work with current Move logic because `deposit_monster` always fills side A when `player_a == player_b`. UI now surfaces Practice as unavailable instead of faking it.
+- Validation completed:
+  - `npm run typecheck`
+  - `npm run lint`
+  - `npm run build`
+  - Playwright skill client run against `/arena`
+  - manual iPhone-sized screenshots captured for Lobby / Flow / Room
+
+## 2026-03-06 Update (Arena Reset)
+- User requested a hard reset because the deployed `/arena` still looked like the old system.
+- Deleted the modular `src/app/arena/` feature tree instead of patching it again.
+- Replaced `src/app/pages/ArenaPage.tsx` with a minimal reset screen:
+  - no lobby logic
+  - no room logic
+  - no match recovery
+  - stale `?match=` URLs are acknowledged but intentionally ignored
+- Goal of this reset: leave `/arena` as a clean slate before a full redesign.
+
+## TODO / next-agent suggestions
+- Rebuild arena from zero with a fresh architecture before adding any multiplayer behavior back.
+- Keep battle rules out of the renderer.
+- Design mobile-first from the start instead of adapting desktop screens later.
+
+## 2026-03-06 Update (Arena Lobby Rebuild After Reset)
+- Rebuilt `/arena` from the reset state into a new modular feature tree under `src/app/arena/`.
+- New frontend modules:
+  - `network/`
+    - `types.ts`
+    - `socket.ts`
+    - `useLobbyPresence.ts`
+    - `useRoomPresence.ts`
+  - `battle-engine/`
+    - `battleEngine.ts`
+  - `lobby/`
+    - `LobbyScreen.tsx`
+  - `battle-room/`
+    - `BattleRoomScreen.tsx`
+  - `arena-ui/`
+    - `ArenaMonsterPanel.tsx`
+    - `BattleArenaScreen.tsx`
+  - `ArenaExperience.tsx`
+- Replaced `src/app/pages/ArenaPage.tsx` with the new arena feature shell.
+- Extended Cloudflare worker protocol:
+  - global `/lobby` websocket for players / invites / open matches
+  - `/room/:roomId` websocket for isolated room presence, legend selection, wager preview, and ready state
+- Added room state persistence in Durable Object storage for room notices and participant state.
+
+## Behavior implemented
+- Lobby:
+  - online players list
+  - invite flow
+  - invite accept -> create on-chain match -> both clients receive room start
+  - open matches list (join flow wired)
+  - live battles list with watch action
+  - monster picker for your legend
+- Battle room:
+  - shows Player A / Player B sides
+  - shows selected or deposited legend on each side
+  - wager chips
+  - deposit button
+  - withdraw button
+  - ready button only enabled once both legends are deposited and room is locked
+  - room feed / leave notices
+- Battle screen:
+  - large ATTACK / SPECIAL / DEFEND / EMOTE buttons
+  - predictive battle frames for pre-result animation
+  - actual on-chain resolution still uses `start_battle`
+  - winner / payout result card when finished
+
+## Contract constraints kept explicit
+- Turn-by-turn combat is still not on-chain. The battle screen uses a local animation engine, but final resolution still comes from `monster::start_battle`.
+- Automatic full cancel/refund when a player leaves is only possible pre-lock with `withdraw`. Once the match is locked, the current Move contract does not support automatic peer cancellation.
+
+## Verification / Testing
+- `npm run typecheck` passed
+- `npm run lint` passed
+- `npm run build` passed
+- Playwright skill client run:
+  - `/tmp/anavrin-arena-preview/shot-0.png`
+- Additional mobile viewport screenshot:
+  - `/tmp/anavrin-arena-mobile.png`
+  - metrics: `scrollWidth === clientWidth === 390`
+
+## TODO / next-agent suggestions
+- Validate the authenticated wallet flow manually in-browser because automation cannot connect a Sui wallet in this environment.
+- Consider tightening the global header nav on very narrow mobile widths; the arena route itself is not overflowing, but the nav still scrolls horizontally.
+- If the user wants real turn-based ATTACK / DEFEND / SPECIAL choices to affect the result, the Move contract must change. Current frontend only animates around deterministic on-chain resolution.
+
+---
+
+Current prompt: The Arena has 3 states: Lobby, Room, Battle. Build a clean arena system with mobile-friendly UX, online players, invite -> room -> deposit -> ready -> battle flow, generated room IDs, optional wager, and room/server helpers.
+
+## 2026-03-06 Update (Arena 3-State Rebuild)
+- Continued the TypeScript arena rebuild under `src/app/arena` instead of patching legacy paths.
+- Restored a green typecheck baseline by finishing the interrupted `ArenaExperience.tsx` refactor.
+- Added/kept the requested architecture entry files:
+  - `src/app/arena/Lobby.tsx`
+  - `src/app/arena/Room.tsx`
+  - `src/app/arena/Battle.tsx`
+  - `src/app/hooks/useArena.ts`
+  - `src/server/arenaRooms.ts`
+- `useArena.ts`
+  - now restores the active room from URL/localStorage and opens on the `room` screen immediately when a room or match already exists.
+- `src/server/arenaRooms.ts`
+  - defines `BattleRoomRecord`, room status values, room storage key, and generated `roomId` helpers.
+- `ArenaExperience.tsx`
+  - invite flow now generates a room id, stores it, updates query params, and moves the inviter into the room immediately.
+  - room state can exist before the on-chain match exists.
+  - player A / player B previews now fall back to room websocket participants when the match object is not loaded yet.
+- `battleEngine.ts`
+  - room model now supports the pre-match waiting state (`invite sent / waiting for accept`).
+- `BattleRoomScreen.tsx`
+  - shows room id and battle id badges.
+  - supports “room exists but match not created yet” state.
+  - simplifies controls to `Withdraw`, `Ready`, `Deposit`, `Battle` with clearer lock conditions.
+  - adds per-side deposit/ready/withdraw status chips for Player A and Player B.
+- Websocket heartbeat intervals for lobby + room were tightened to 10s to better match the requested online detection behavior.
+- Mobile header was refactored in `src/app/components/Header.tsx`:
+  - brand + wallet button stay visible
+  - nav routes are rendered in a small-screen grid instead of an overflowing horizontal strip.
+
+## Verification / Testing
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- Browser screenshot validation:
+  - Desktop arena screenshot: `/tmp/anavrin-arena-validate/shot-0.png`
+  - Mobile arena screenshot: `/tmp/anavrin-arena-mobile-check-2.png`
+- Mobile width check passed:
+  - `scrollWidth === clientWidth === 390`
+
+## Known limitations / next-agent notes
+- The room websocket exists before the on-chain match, but actual NFT deposit still requires the Sui `ArenaMatch` shared object to exist.
+- True practice/self-battle is still blocked by the Move contract because same-address matches cannot fill both sides with the current `deposit_monster` behavior.
+- Connected-wallet room/battle screens still need a full manual two-wallet smoke test after deploy to verify invite acceptance and deposit timing end-to-end.
+- Bundle size warning remains on production build (`dist/assets/index-*.js > 500 kB`) but build succeeds.
+
+## 2026-03-06 Update (Arena Entry Reset)
+- Fixed arena entry behavior so plain `/arena` no longer restores stale room or match state.
+- `src/app/hooks/useArena.ts`
+  - removed automatic room restore from local storage.
+  - arena now starts in `lobby` unless explicit `room` or `match` query params are present.
+- `src/app/arena/ArenaExperience.tsx`
+  - removed auto-load of `restoredOwnedMatch` on plain arena visits.
+  - added hard reset path when there is no `room` or `match` query param:
+    - clears active match
+    - clears room state
+    - clears persisted match id
+    - forces `lobby` screen
+  - `Back To Lobby` now clears room/match params instead of only swapping visible screen state.
+
+## Verification / Testing
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- Mobile browser validation on plain `/arena`:
+  - screenshot: `/tmp/anavrin-arena-lobby-reset.png`
+  - confirmed `hasBattleRoomText=false`
+  - confirmed `hasLobbyHeroText=true`
+  - confirmed `scrollWidth === clientWidth === 390`
+
+## 2026-03-06 Update (Arena Flow Fix: Lobby -> Room -> Battle)
+- Fixed incorrect arena state promotion in `src/app/arena/ArenaExperience.tsx`.
+- Changes:
+  - `?match=` deep links now load into `room` for active matches instead of forcing `battle` immediately.
+  - removed automatic room-to-battle promotion when both players are marked ready.
+  - battle screen now opens only when the user explicitly taps the battle action, unless the match is already finished/resolved.
+  - `handleOpenBattle` now guards against opening battle early when the room is not actually startable.
+
+## Verification / Testing
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- Browser screenshot validation on `/arena`:
+  - `/tmp/anavrin-arena-flow-fix/shot-0.png`
+- Note:
+  - full wallet-connected invite/deposit/ready smoke test still requires manual two-wallet validation.
+
+## 2026-03-06 Update (Heartbeat Presence Sweep)
+- Updated realtime presence to rely on heartbeat age instead of only socket lifecycle.
+- `workers/arena-lobby.ts`
+  - added `ONLINE_WINDOW_MS = 20_000`
+  - added stale presence sweep for lobby players
+  - added stale presence sweep for room participants
+  - lobby state now filters `players` by recent `lastSeen`
+  - room participants now automatically flip `present=false` and `ready=false` once heartbeats age out
+- `src/app/arena/network/useLobbyPresence.ts`
+  - heartbeat ping tightened from 10s to 5s
+- `src/app/arena/network/useRoomPresence.ts`
+  - heartbeat ping tightened from 10s to 5s
+
+## Verification / Testing
+- `npm run typecheck` passed.
+- `npm run lint` passed.
+- `npm run build` passed.
+- Worker syntax bundle passed:
+  - `npx esbuild workers/arena-lobby.ts --bundle --format=esm --platform=browser --outfile=/tmp/arena-lobby-worker-check.js`
+- Browser screenshot validation:
+  - `/tmp/anavrin-arena-presence-fix/shot-0.png`
+
+## Remaining check
+- Need a live two-browser or two-wallet smoke test against the deployed worker to verify the online roster updates and stale players disappear after ~20s without heartbeat.
+
+## 2026-03-06 Update (Arena invite accept fix)
+- Patched `src/app/arena/ArenaExperience.tsx` so accepting an invite stages the room immediately, and failed room creation now resets cleanly to the lobby instead of leaving the UI stuck or ending in an unhandled promise.
+- Next validation: `npm run typecheck`, `npm run lint`, `npm run build`, then browser smoke check.
+
+- Fixed arena URL/state sync so staged room entry is not immediately reset back to lobby while search params catch up.
+
+- Reworked invite accept flow: `ACCEPT!` now joins the room immediately and no longer depends on the on-chain `create_match` transaction. Added a separate in-room `OPEN ROOM` step that creates the on-chain match once both trainers are present.
+
+- Fixed `ArenaMatch` parsing: deposited monsters in `mon_a` / `mon_b` are direct embedded objects on-chain, not option vectors. Room control gating now uses the embedded monster snapshots, so locked matches can enable READY/BATTLE correctly.
+
+- Added active match polling so opponent deposits update the room without a manual refresh.
+- Made the visible player-side controls clickable so Deposit / Ready / Withdraw / Battle actions work in the panel the user is already looking at.
+
+- Reworked room actions for mobile: fixed bottom action rail, bigger ready/battle controls, in-room battle trigger, and explicit lock messaging for withdraw.
+
+## 2026-03-06 Update (Guided Arena Room Flow)
+- Reworked `src/app/arena/battle-room/BattleRoomScreen.tsx` to remove duplicated inline action buttons.
+- Added a single guided `Next Move` flow with step tracker: Invite -> Deposit -> Ready -> Battle.
+- Fixed room CTA logic so the primary button changes automatically based on room state.
+- Locked monster/wager selection after the player's legend is deposited to avoid misleading state changes.
+- Added room connection awareness to READY flow:
+  - `ArenaExperience.tsx` now blocks READY taps and shows a toast if the room socket is not live.
+  - `battleEngine.ts` now exposes `playerReady` and `opponentReady` perspective flags.
+- Safety action now prefers `Withdraw Safely` while contract allows it; otherwise the room explains when the pool is locked.
+
+## Verification
+- `npm run typecheck` passed
+- `npm run lint` passed
+- `npm run build` passed
+
+## Next-Agent Notes
+- Real two-wallet room test is still needed for the new guided action rail.
+- If READY still appears flaky on mobile after deploy, inspect websocket reconnect timing from `useRoomPresence.ts` against the new room CTA state.
+
+## 2026-03-06 Update (Chain-First Arena Recovery + Winner Spotlight)
+- `src/app/arena/ArenaExperience.tsx`
+  - added initial active-match recovery from `useArenaMatches().restoredOwnedMatch`.
+  - recovery only runs once per page load, and only when there is no explicit `room` or `match` query param.
+  - active on-chain match (`status 0/1`) now restores straight into the room screen after refresh/crash/disconnect.
+  - removed invalid fallback that aliased `roomId = matchId`.
+  - tightened active match polling from `3500ms` to `3000ms`.
+  - battle actions are now disabled for spectators even when an active locked match is loaded.
+- `src/app/arena/battle-room/BattleRoomScreen.tsx`
+  - room header now shows restored total stake from chain.
+  - per-side status cards now show each side's restored stake amount.
+  - contract-driven action rail kept intact (`deposit -> withdraw if status 0 -> battle if status 1`).
+- `src/app/arena/arena-ui/BattleArenaScreen.tsx`
+  - battle result screen now includes a winner spotlight card with the winning monster image.
+
+## Verification
+- `npm run typecheck` passed
+- `npm run lint` passed
+- `npm run build` passed
+- Playwright/browser smoke pass on `/arena`:
+  - screenshots: `/tmp/anavrin-arena-recovery-check/shot-0.png`, `/tmp/anavrin-arena-recovery-check/shot-1.png`
+- Direct chain sanity check via `tsx` against mainnet arena matches completed successfully.
+
+## Next-Agent Notes
+- If a true room websocket restore after refresh is needed, persist a verified room id separately from the match id; do not infer room id from the match object.
+- Admin cancel tooling already exists in `src/app/pages/AdminPage.tsx`; no new admin fallback code was needed for this pass.
+
+## 2026-03-06 Update (Mobile Flow Audit)
+- Refined room guidance so both trainers now see explicit next-task cards:
+  - `You`
+  - `Opponent`
+- `battleEngine.ts`
+  - added `yourTaskLabel`, `yourTaskDetail`, `opponentTaskLabel`, `opponentTaskDetail` to `RoomModel`
+  - contract-aligned messaging now covers:
+    - waiting for invite accept
+    - both trainers present / open room
+    - deposit your legend
+    - wait or withdraw safely
+    - either trainer can start battle
+- `BattleRoomScreen.tsx`
+  - added dual task cards under `Next Move`
+  - added `Battle Ready` banner once both legends are deposited and the match is locked
+  - collapsed monster/wager setup sections after deposit to reduce mobile scroll length
+  - added compact `Your Loadout` summary after deposit/waiting/battle states
+- `ArenaExperience.tsx`
+  - updated stale copy so the arena shell no longer mentions the removed `READY` step
+
+## Verification
+- `npm run typecheck` passed
+- `npm run lint` passed earlier in this session on the same code path
+- `npm run build` passed
+- Playwright skill-client run on `/arena`:
+  - screenshots in `/tmp/anavrin-arena-skill-pass`
+- Mobile browser audit:
+  - screenshot `/tmp/anavrin-arena-mobile-audit.png`
+  - width check passed: `scrollWidth === clientWidth === 390`
+
+## Remaining risk
+- Full connected two-wallet mobile validation is still needed for the actual in-room signed flow, because local browser automation cannot sign wallet transactions.
+
+## 2026-03-06 Update (Room Chat)
+- Added persistent room chat over the existing room websocket so trainers can coordinate wager / open-room / battle steps.
+- `workers/arena-lobby.ts`
+  - added `roomChat` message type
+  - room state now persists `messages` alongside participants/notices
+  - chat messages are stored in the Durable Object and replayed after refresh/reconnect
+- `src/app/arena/network/types.ts`
+  - added `RoomChatMessage`
+  - `RoomState` now includes `messages`
+- `src/app/arena/network/useRoomPresence.ts`
+  - now tracks `messages`
+  - added `sendChat(text)` helper
+- `src/app/arena/ArenaExperience.tsx`
+  - passes room chat messages and send handler into room screen
+- `src/app/arena/battle-room/BattleRoomScreen.tsx`
+  - added `Room Chat` panel
+  - added quick coordination prompts
+  - added inline message composer and message history
+
+## Verification
+- `npm run typecheck` passed
+- `npm run lint` passed
+- `npm run build` passed
+- worker bundle check passed:
+  - `/tmp/arena-lobby-worker-chat-check.js`
+- mobile width check passed:
+  - `scrollWidth === clientWidth === 390`
+  - screenshot: `/tmp/anavrin-arena-chat-mobile.png`
+
+## Deployment note
+- This change modifies the room websocket protocol, so Pages deploy alone is not enough.
+- Worker must be redeployed with `npm run lobby:deploy` after publishing.
+
+## 2026-03-06 arena scalability refactor
+- Split arena flow into dedicated routes: /lobby, /queue, /battle/:matchId, /spectate/:matchId, /my-monsters; /arena now redirects to /lobby and /legends redirects to /my-monsters.
+- Extended Cloudflare worker to store queue entries and battle summaries, expose /api/lobby/snapshot and /api/battles endpoints, and keep room chat/viewer counts per match room.
+- Added frontend HTTP client for battle summaries and queue/lobby metadata plus route-local battle recovery hook (polls one match every 3s).
+- New battle route uses chain as source of truth for one ArenaMatch, updates backend battle summaries, and joins room chat/viewer websocket keyed by matchId.
+- Fixed local route conflict by moving websocket namespace from /lobby and /room/* to /ws/lobby and /ws/room/*. Vite now proxies both /ws and /api to the worker in local dev.
+- Validation run: npm run typecheck, npm run lint, npm run build. Browser screenshots checked for /lobby and /queue. Direct /lobby preview route fixed after websocket namespace change.
+- Remaining real-world validation: deploy the updated worker before testing preview/production battle summary fetches, because the new /api endpoints and CORS headers live in the worker.
+
+## 2026-03-06 Update (Lobby socket fallback for production drift)
+- Fixed online presence connection issue caused by frontend websocket namespace drift.
+- Production worker is still serving legacy websocket paths (`/lobby`, `/room/:id`) while the current frontend was trying modern paths (`/ws/lobby`, `/ws/room/:id`).
+- Added socket candidate fallback in:
+  - `src/app/arena/network/socket.ts`
+  - `src/app/arena/network/useLobbyPresence.ts`
+  - `src/app/arena/network/useRoomPresence.ts`
+- Frontend now tries modern websocket paths first, then falls back to legacy paths automatically if the worker has not been redeployed yet.
+- Verified live worker behavior with a two-wallet synthetic websocket probe: both wallets appeared online concurrently.
+- Validation run: `npm run typecheck`, `npm run lint`, `npm run build`.
+
+## Next-Agent Notes
+- There is unfinished local 3D battle renderer work in the worktree (`src/app/three/*`, `src/app/components/MonsterViewport3D.tsx`, related type/package changes). It was intentionally left out of the online-detection publish.
+- If that 3D work is resumed, re-run validation before publishing because those files are not currently part of the pushed fix.
