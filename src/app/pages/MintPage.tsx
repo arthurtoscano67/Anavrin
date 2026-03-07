@@ -3,7 +3,6 @@ import { useCurrentAccount, useSuiClient } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
 
 import { PageShell } from "../components/PageShell";
-import { MonsterImage } from "../components/MonsterImage";
 import { StageBadge } from "../components/StageBadge";
 import { Spinner } from "../components/Spinner";
 import { CLOCK_ID, MODULE, MONSTER_TYPE, PACKAGE_ID, TREASURY_ID } from "../lib/constants";
@@ -27,6 +26,29 @@ export function MintPage() {
   const previewMonster = useMemo(() => {
     return minted ?? walletMonsters.data?.find((monster) => monster.objectId === previewId) ?? null;
   }, [minted, previewId, walletMonsters.data]);
+  const previewTraits = useMemo(() => {
+    return {
+      seed: String(previewMonster?.seed ?? 42),
+      stage: Number(previewMonster?.stage ?? 0),
+      attack: Number(previewMonster?.attack ?? 50),
+      defense: Number(previewMonster?.defense ?? 50),
+      speed: Number(previewMonster?.speed ?? 50),
+      wins: Number(previewMonster?.wins ?? 0),
+      xp: Number(previewMonster?.xp ?? 0),
+    };
+  }, [previewMonster]);
+  const previewUrl = useMemo(() => {
+    const params = new URLSearchParams({
+      seed: previewTraits.seed,
+      stage: String(previewTraits.stage),
+      attack: String(previewTraits.attack),
+      defense: String(previewTraits.defense),
+      speed: String(previewTraits.speed),
+      wins: String(previewTraits.wins),
+      xp: String(previewTraits.xp),
+    });
+    return `https://heart-beat-production.up.railway.app/martian/preview?${params.toString()}`;
+  }, [previewTraits]);
 
   const onMint = async () => {
     if (!account) return;
@@ -69,12 +91,16 @@ export function MintPage() {
             <div className="text-sm text-gray-300">Live Animated Preview</div>
             {minted && <StageBadge stage={minted.stage} />}
           </div>
-          {previewId ? (
-            <MonsterImage objectId={previewId} monster={previewMonster} className="aspect-square" />
-          ) : (
-            <div className="grid aspect-square place-items-center rounded-2xl border border-borderSoft bg-black/20 text-gray-500">No preview yet</div>
-          )}
-          <p className="text-xs text-gray-400">Procedural SVG is generated from the on-chain seed, stage, and battle traits.</p>
+          <div className="overflow-hidden rounded-2xl border border-borderSoft bg-black/20">
+            <img
+              key={previewTraits.seed}
+              src={previewUrl}
+              alt="Animated Martian preview"
+              className="aspect-square w-full object-cover"
+              loading="eager"
+            />
+          </div>
+          <p className="text-xs text-gray-400">Animated preview is rendered from the current seed, form, and battle traits.</p>
         </div>
 
         <div className="glass-card space-y-5 p-5">
