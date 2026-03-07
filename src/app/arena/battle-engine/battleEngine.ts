@@ -16,6 +16,10 @@ export type RoomModel = {
   heroHint: string;
   nextActionLabel: string;
   opponentStatusLabel: string;
+  yourTaskLabel: string;
+  yourTaskDetail: string;
+  opponentTaskLabel: string;
+  opponentTaskDetail: string;
 };
 
 export type BattleFrame = {
@@ -165,40 +169,85 @@ export function buildRoomModel(input: {
   let heroHint = 'Invite a player, accept an invite, and build a room.';
   let nextActionLabel = 'Invite';
   let opponentStatusLabel = opponent?.present ? 'Online' : 'Offline';
+  let yourTaskLabel = 'Invite a trainer';
+  let yourTaskDetail = 'Start from the lobby and open a room.';
+  let opponentTaskLabel = 'Come online';
+  let opponentTaskDetail = 'The other trainer needs the arena page open.';
 
   if (!match && participants.length > 0) {
-    heroTitle = 'Room open.';
-    heroHint = participants.length === 1
-      ? 'Invite sent. Wait for the other trainer to accept so the on-chain match can open.'
-      : 'Both trainers are here. Wait for the on-chain match to load, then deposit your legends.';
-    nextActionLabel = 'Wait';
-    opponentStatusLabel = opponent?.present ? 'In room' : 'Invite pending';
+    if (participants.length === 1) {
+      heroTitle = 'Room open.';
+      heroHint = 'Keep this room open. The other trainer needs to accept the invite and join.';
+      nextActionLabel = 'Wait';
+      opponentStatusLabel = opponent?.present ? 'In room' : 'Invite pending';
+      yourTaskLabel = 'Wait in room';
+      yourTaskDetail = 'Stay here so the room is ready when they accept.';
+      opponentTaskLabel = 'Accept invite';
+      opponentTaskDetail = 'They need to tap ACCEPT in the lobby first.';
+    } else {
+      heroTitle = 'Both trainers are here.';
+      heroHint = 'Open the on-chain battle room first. Either trainer can tap the next button.';
+      nextActionLabel = 'Open room';
+      opponentStatusLabel = 'In room';
+      yourTaskLabel = 'Open battle room';
+      yourTaskDetail = 'Tap the next button once. This creates the on-chain match object.';
+      opponentTaskLabel = 'Open battle room';
+      opponentTaskDetail = 'Either trainer can do this. Once it opens, both sides deposit.';
+    }
   } else if (match && match.status === 3) {
     heroTitle = 'Battle cancelled.';
     heroHint = 'The room was cancelled. Legends should be back with their trainers.';
     nextActionLabel = 'Back to lobby';
     opponentStatusLabel = 'Left room';
+    yourTaskLabel = 'Return to lobby';
+    yourTaskDetail = 'This room is over. Start a fresh battle from the lobby.';
+    opponentTaskLabel = 'Return to lobby';
+    opponentTaskDetail = 'The other trainer should also start from the lobby again.';
   } else if (resolution || match?.status === 2) {
     heroTitle = 'Battle finished.';
     heroHint = 'Watch the result and jump into the next fight.';
     nextActionLabel = 'Watch result';
     opponentStatusLabel = 'Fight ended';
+    yourTaskLabel = 'See result';
+    yourTaskDetail = 'The fight is done and the legends are back in their wallets.';
+    opponentTaskLabel = 'See result';
+    opponentTaskDetail = 'The other trainer is also done with this room.';
   } else if (match) {
     if (!playerDeposited) {
       heroTitle = 'Send your legend.';
       heroHint = 'Your side is empty. Deposit your NFT and set your wager.';
       nextActionLabel = 'Deposit';
       opponentStatusLabel = opponentDeposited ? 'Legend loaded' : opponent?.present ? 'Choosing legend' : 'Not in room';
+      yourTaskLabel = 'Deposit legend';
+      yourTaskDetail = 'Pick your legend and optional wager, then deposit once.';
+      opponentTaskLabel = opponentDeposited ? 'Waiting on you' : opponent?.present ? 'Pick a legend' : 'Return to room';
+      opponentTaskDetail = opponentDeposited
+        ? 'They are already deposited. Your deposit is the next step.'
+        : opponent?.present
+          ? 'They still need to choose and deposit their legend.'
+          : 'They need to reopen the room to continue.';
     } else if (!opponentDeposited) {
       heroTitle = 'Waiting for the other side.';
       heroHint = 'Your legend is loaded. They still need to deposit theirs. You can withdraw safely until they do.';
       nextActionLabel = 'Wait';
       opponentStatusLabel = opponent?.present ? 'Needs deposit' : 'Left room';
+      yourTaskLabel = canWithdraw ? 'Wait or withdraw' : 'Wait for deposit';
+      yourTaskDetail = canWithdraw
+        ? 'Your legend is safe in the pool. You can still withdraw before they deposit.'
+        : 'Stay in the room until the other trainer deposits.';
+      opponentTaskLabel = opponent?.present ? 'Deposit legend' : 'Return to room';
+      opponentTaskDetail = opponent?.present
+        ? 'Their next step is depositing a legend into the pool.'
+        : 'They need to come back to the room before the battle can continue.';
     } else {
       heroTitle = 'Battle now.';
       heroHint = 'Both legends are deposited. Anyone can start the battle now.';
       nextActionLabel = 'Battle';
       opponentStatusLabel = opponent?.present ? 'Deposited' : 'Locked in';
+      yourTaskLabel = 'Start battle';
+      yourTaskDetail = 'The match is locked. Either trainer can tap Battle Now.';
+      opponentTaskLabel = 'Start battle';
+      opponentTaskDetail = 'They see the same Battle Now prompt on their side.';
     }
   }
 
@@ -214,6 +263,10 @@ export function buildRoomModel(input: {
     heroHint,
     nextActionLabel,
     opponentStatusLabel,
+    yourTaskLabel,
+    yourTaskDetail,
+    opponentTaskLabel,
+    opponentTaskDetail,
   };
 }
 

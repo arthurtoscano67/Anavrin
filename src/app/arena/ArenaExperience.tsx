@@ -540,7 +540,7 @@ export function ArenaExperience() {
 
   if (!account) {
     return (
-      <PageShell title="Arena" subtitle="Connect your Sui wallet to battle.">
+      <PageShell title="Arena" subtitle="Connect your Sui wallet to invite, deposit, and battle.">
         <div className="space-y-4">
           <section className="glass-card space-y-4 p-5 sm:p-6">
             <div className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan/80">Anavrin Legends</div>
@@ -560,9 +560,9 @@ export function ArenaExperience() {
             </section>
             <section className="glass-card space-y-3 p-5">
               <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">2. Room</div>
-              <div className="text-2xl font-black text-white">Load legends and ready up</div>
+              <div className="text-2xl font-black text-white">Open room and deposit legends</div>
               <div className="rounded-[22px] border border-borderSoft bg-black/20 p-4 text-sm text-gray-400">
-                Deposit NFTs, set wager, and glow READY when both sides are loaded.
+                Open the on-chain match, deposit NFTs, and keep withdraw open until both sides are in.
               </div>
             </section>
             <section className="glass-card space-y-3 p-5">
@@ -581,7 +581,7 @@ export function ArenaExperience() {
   const loading = walletMonsters.isLoading || arenaMatches.isLoading || recoveringFromChain;
 
   return (
-    <PageShell title="Arena" subtitle="Invite. Deposit. Ready. Battle.">
+    <PageShell title="Arena" subtitle="Invite. Open Room. Deposit. Battle.">
       <div className="flex flex-wrap gap-2">
         {(['lobby', 'room', 'battle'] as ArenaScreen[]).map((step) => (
           <button

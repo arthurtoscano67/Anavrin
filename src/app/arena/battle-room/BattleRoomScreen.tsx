@@ -91,6 +91,8 @@ export function BattleRoomScreen({
   const selectionLocked = roomModel.playerDeposited || actionDisabled;
   const withdrawLocked = Boolean(match?.status === 1 || match?.status === 2 || match?.status === 3);
   const totalStakeSui = match ? toSui((BigInt(match.stake_a || '0') + BigInt(match.stake_b || '0')).toString()) : '0.0000';
+  const showSetupPanels = Boolean(match && !roomModel.playerDeposited && match.status === 0);
+  const showLoadoutSummary = !showSetupPanels;
 
   const connectionLabel = roomConnectionState === 'open'
     ? 'Room Live'
@@ -289,9 +291,29 @@ export function BattleRoomScreen({
             <p className="mt-2 text-xs font-semibold text-red-200">{roomLastError}</p>
           ) : null}
         </div>
+
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div className="rounded-[22px] border border-cyan/20 bg-cyan/10 p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-100/80">You</div>
+            <div className="mt-2 text-lg font-black text-white">{roomModel.yourTaskLabel}</div>
+            <p className="mt-2 text-sm leading-6 text-cyan-50/90">{roomModel.yourTaskDetail}</p>
+          </div>
+          <div className="rounded-[22px] border border-white/10 bg-white/5 p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gray-300">Opponent</div>
+            <div className="mt-2 text-lg font-black text-white">{roomModel.opponentTaskLabel}</div>
+            <p className="mt-2 text-sm leading-6 text-gray-300">{roomModel.opponentTaskDetail}</p>
+          </div>
+        </div>
       </section>
 
       <section className="arena-stage overflow-hidden rounded-[32px] border border-borderSoft p-4 sm:p-6">
+        {roomModel.canStartBattle ? (
+          <div className="relative z-10 mb-4 rounded-[24px] border border-fuchsia-300/30 bg-fuchsia-500/12 px-4 py-4 text-center arena-ready-glow">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-fuchsia-100/80">Battle Ready</div>
+            <div className="mt-2 text-xl font-black text-white">Both legends are in. Either trainer can start the battle now.</div>
+          </div>
+        ) : null}
+
         <div className="relative z-10 grid gap-4 lg:grid-cols-[1fr_120px_1fr] lg:items-center">
           <ArenaMonsterPanel
             title="Player A"
@@ -354,62 +376,102 @@ export function BattleRoomScreen({
         </div>
       </section>
 
-      <section className="glass-card space-y-4 p-5 sm:p-6">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Your Monsters</div>
-            <div className="mt-1 text-xl font-black text-white">
-              {roomModel.playerDeposited ? 'Legend locked into the room' : 'Tap one to bring it in'}
+      {showLoadoutSummary ? (
+        <section className="glass-card space-y-3 p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Your Loadout</div>
+              <div className="mt-1 text-xl font-black text-white">
+                {roomModel.playerDeposited ? 'Locked in for battle' : 'Waiting for the next setup step'}
+              </div>
+            </div>
+            {selectedMonster ? (
+              <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm font-semibold text-gray-200">
+                {selectedMonster.name}
+              </div>
+            ) : null}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-[20px] border border-white/10 bg-black/20 px-4 py-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">Legend</div>
+              <div className="mt-2 text-lg font-black text-white">
+                {roomModel.playerDeposited
+                  ? (roomModel.playerSide === 'a' ? playerAMonster?.name : playerBMonster?.name) ?? 'Deposited'
+                  : selectedMonster?.name ?? 'None selected'}
+              </div>
+            </div>
+            <div className="rounded-[20px] border border-white/10 bg-black/20 px-4 py-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">Wager</div>
+              <div className="mt-2 text-lg font-black text-white">
+                {roomModel.playerSide === 'a'
+                  ? `${toSui(match?.stake_a ?? '0')} SUI`
+                  : roomModel.playerSide === 'b'
+                    ? `${toSui(match?.stake_b ?? '0')} SUI`
+                    : `${selectedStake} SUI`}
+              </div>
             </div>
           </div>
-          <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-gray-200">
-            {monsters.length} ready
-          </div>
-        </div>
-        {roomModel.playerDeposited ? (
-          <div className="rounded-[18px] border border-green-300/25 bg-green-500/10 px-4 py-3 text-sm text-green-100">
-            Your legend is already in the battle pool. Withdraw first if you want to switch.
-          </div>
-        ) : null}
-        <div className="no-scrollbar flex gap-3 overflow-x-auto pb-2">
-          {monsters.map((monster) => {
-            const selected = monster.objectId === selectedMonsterId;
-            return (
-              <button
-                key={monster.objectId}
-                className={`w-[170px] shrink-0 rounded-[24px] border p-3 text-left disabled:opacity-45 ${selected ? 'border-purple/70 bg-purple/15' : 'border-borderSoft bg-black/20'}`}
-                onClick={() => onPickMonster(monster.objectId)}
-                disabled={selectionLocked}
-              >
-                <MonsterImage objectId={monster.objectId} monster={monster} className="aspect-square" />
-                <div className="mt-2 text-lg font-black text-white">{monster.name}</div>
-                <div className="mt-1"><StageBadge stage={monster.stage} /></div>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+          {roomModel.canWithdraw ? (
+            <div className="rounded-[18px] border border-red-300/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+              Safety exit is still open. You can withdraw until the other trainer deposits.
+            </div>
+          ) : roomModel.playerDeposited ? (
+            <div className="rounded-[18px] border border-white/10 bg-white/5 px-4 py-3 text-sm text-gray-300">
+              Your legend is already locked into the pool. Withdraw closes once both legends are deposited because the contract locks the match.
+            </div>
+          ) : null}
+        </section>
+      ) : (
+        <>
+          <section className="glass-card space-y-4 p-5 sm:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Your Monsters</div>
+                <div className="mt-1 text-xl font-black text-white">Tap one to bring it in</div>
+              </div>
+              <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-gray-200">
+                {monsters.length} ready
+              </div>
+            </div>
+            <div className="no-scrollbar flex gap-3 overflow-x-auto pb-2">
+              {monsters.map((monster) => {
+                const selected = monster.objectId === selectedMonsterId;
+                return (
+                  <button
+                    key={monster.objectId}
+                    className={`w-[170px] shrink-0 rounded-[24px] border p-3 text-left disabled:opacity-45 ${selected ? 'border-purple/70 bg-purple/15' : 'border-borderSoft bg-black/20'}`}
+                    onClick={() => onPickMonster(monster.objectId)}
+                    disabled={selectionLocked}
+                  >
+                    <MonsterImage objectId={monster.objectId} monster={monster} className="aspect-square" />
+                    <div className="mt-2 text-lg font-black text-white">{monster.name}</div>
+                    <div className="mt-1"><StageBadge stage={monster.stage} /></div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
 
-      <section className="glass-card space-y-4 p-5 sm:p-6">
-        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Wager</div>
-        <div className="text-sm text-gray-300">
-          {roomModel.playerDeposited
-            ? 'Wager is locked because your legend is already in the pool.'
-            : 'Optional. Pick a wager before you deposit.'}
-        </div>
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-          {STAKE_OPTIONS.map((option) => (
-            <button
-              key={option}
-              className={`min-h-[62px] rounded-[18px] border text-base font-black disabled:opacity-45 ${selectedStake === option ? 'border-cyan/70 bg-cyan/15 text-white' : 'border-borderSoft bg-black/20 text-gray-300'}`}
-              onClick={() => onPickStake(option)}
-              disabled={selectionLocked}
-            >
-              {option === '0' ? 'NO' : `${option} SUI`}
-            </button>
-          ))}
-        </div>
-      </section>
+          <section className="glass-card space-y-4 p-5 sm:p-6">
+            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Wager</div>
+            <div className="text-sm text-gray-300">
+              Optional. Pick a wager before you deposit.
+            </div>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+              {STAKE_OPTIONS.map((option) => (
+                <button
+                  key={option}
+                  className={`min-h-[62px] rounded-[18px] border text-base font-black disabled:opacity-45 ${selectedStake === option ? 'border-cyan/70 bg-cyan/15 text-white' : 'border-borderSoft bg-black/20 text-gray-300'}`}
+                  onClick={() => onPickStake(option)}
+                  disabled={selectionLocked}
+                >
+                  {option === '0' ? 'NO' : `${option} SUI`}
+                </button>
+              ))}
+            </div>
+          </section>
+        </>
+      )}
 
       {roomNotices.length > 0 ? (
         <section className="glass-card space-y-3 p-5">
