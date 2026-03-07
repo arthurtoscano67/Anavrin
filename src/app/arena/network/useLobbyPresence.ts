@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { buildArenaSocketUrl } from './socket';
 import type {
+  InviteAccepted,
   LobbyConnectionState,
   LobbyInvite,
   LobbyOpenMatch,
@@ -25,6 +26,7 @@ type LobbyEnvelope = {
   recentMatches?: LobbyRecentMatch[];
   invite?: LobbyInvite;
   match?: StartedMatch;
+  accepted?: InviteAccepted;
   message?: string;
 };
 
@@ -118,6 +120,10 @@ export function useLobbyPresence({ enabled, address, monsterName = 'Legend', lev
             setStartedMatch(payload.match);
             return;
           }
+          if (payload.type === 'inviteAccepted' && payload.accepted) {
+            setInvites((current) => current.filter((invite) => invite.id !== payload.accepted?.inviteId));
+            return;
+          }
           if (payload.type === 'error') {
             setLastError(payload.message ?? 'Lobby socket error');
             setConnectionState('error');
@@ -163,6 +169,20 @@ export function useLobbyPresence({ enabled, address, monsterName = 'Legend', lev
     [address, send]
   );
 
+  const acceptInvite = useCallback(
+    (invite: LobbyInvite) => {
+      if (!address) return;
+      send({
+        type: 'inviteAccepted',
+        inviteId: invite.id,
+        from: invite.from,
+        to: invite.to,
+        roomId: invite.roomId,
+      });
+    },
+    [address, send]
+  );
+
   const postOpenMatch = useCallback(
     (stakeSui: string, fallbackMatchId?: string) => {
       if (!address) return;
@@ -200,6 +220,7 @@ export function useLobbyPresence({ enabled, address, monsterName = 'Legend', lev
     startedMatch,
     lastError,
     invitePlayer,
+    acceptInvite,
     postOpenMatch,
     announceMatchStarted,
     clearStartedMatch,

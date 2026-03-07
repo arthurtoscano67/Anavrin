@@ -29,8 +29,10 @@ export function BattleRoomScreen({
   playerAMonster,
   playerBMonster,
   pending,
+  canCreateRoomMatch,
   onPickMonster,
   onPickStake,
+  onCreateRoomMatch,
   onDeposit,
   onWithdraw,
   onToggleReady,
@@ -51,8 +53,10 @@ export function BattleRoomScreen({
   playerAMonster?: VisualMonster | null;
   playerBMonster?: VisualMonster | null;
   pending: string | null;
+  canCreateRoomMatch: boolean;
   onPickMonster: (monsterId: string) => void;
   onPickStake: (stake: string) => void;
+  onCreateRoomMatch: () => void;
   onDeposit: () => void;
   onWithdraw: () => void;
   onToggleReady: () => void;
@@ -67,6 +71,8 @@ export function BattleRoomScreen({
   const youArePlayerA = Boolean(accountAddress && playerAAddress === accountAddress);
   const youArePlayerB = Boolean(accountAddress && playerBAddress === accountAddress);
   const waitingForMatch = Boolean(currentRoomId && !currentMatchId);
+  const roomWaitingForTrainer = waitingForMatch && !canCreateRoomMatch;
+  const roomCanOpen = waitingForMatch && canCreateRoomMatch;
   const sideAStateLabel = roomModel.playerAReady ? 'Ready' : match?.mon_a ? 'Deposited' : playerAAddress ? 'Waiting' : 'Open';
   const sideBStateLabel = roomModel.playerBReady ? 'Ready' : match?.mon_b ? 'Deposited' : playerBAddress ? 'Waiting' : 'Open';
   const showBattleButton = roomModel.bothReady && Boolean(currentMatchId);
@@ -240,13 +246,17 @@ export function BattleRoomScreen({
           </button>
           <button
             className={`min-h-[68px] rounded-[22px] text-lg font-black disabled:opacity-50 ${roomModel.bothReady ? 'bg-gradient-to-r from-fuchsia-400 to-pink-500 text-slate-950' : 'border border-borderSoft bg-black/20 text-gray-300'}`}
-            onClick={showBattleButton ? onOpenBattle : onDeposit}
-            disabled={pending !== null || (showBattleButton ? false : !roomModel.canDeposit || !currentMatchId)}
+            onClick={showBattleButton ? onOpenBattle : roomCanOpen ? onCreateRoomMatch : onDeposit}
+            disabled={pending !== null || (showBattleButton ? false : roomCanOpen ? false : roomWaitingForTrainer || !roomModel.canDeposit || !currentMatchId)}
           >
-            {showBattleButton ? 'BATTLE' : waitingForMatch ? 'WAITING FOR ACCEPT' : 'DEPOSIT'}
+            {showBattleButton ? 'BATTLE' : roomCanOpen ? 'OPEN ROOM' : roomWaitingForTrainer ? 'WAITING FOR TRAINER' : 'DEPOSIT'}
           </button>
           <div className="grid place-items-center rounded-[22px] border border-white/10 bg-white/5 px-4 text-center text-sm font-semibold text-gray-300">
-            {showBattleButton ? 'Both legends are ready. Enter battle now.' : 'Battle unlocks when both trainers deposit and tap READY.'}
+            {showBattleButton
+              ? 'Both legends are ready. Enter battle now.'
+              : roomCanOpen
+                ? 'Both trainers are here. Open the battle room to unlock deposits.'
+                : 'Battle unlocks when both trainers deposit and tap READY.'}
           </div>
         </div>
       </div>

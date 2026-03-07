@@ -53,6 +53,7 @@ export function ArenaExperience() {
   const [pending, setPending] = useState<string | null>(null);
   const [frameIndex, setFrameIndex] = useState(0);
   const [animatingBattle, setAnimatingBattle] = useState(false);
+  const [roomOpponentAddress, setRoomOpponentAddress] = useState(params.get('opponent') ?? '');
 
   const monsters = walletMonsters.data ?? [];
   const selectedMonster = useMemo(
@@ -99,23 +100,31 @@ export function ArenaExperience() {
     arena.setCurrentMatchId('');
     arena.persistRoomId(null);
     arena.setScreen('lobby');
+    setRoomOpponentAddress('');
     arenaMatches.persistMatchId(null);
     setParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete('match');
       next.delete('room');
+      next.delete('opponent');
       return next;
     });
   }, [arena, arenaMatches.persistMatchId, setParams]);
 
-  const stageRoomEntry = useCallback((roomId: string) => {
+  const stageRoomEntry = useCallback((roomId: string, opponentAddress?: string) => {
     arena.persistRoomId(roomId);
     arena.setScreen('room');
+    if (opponentAddress) {
+      setRoomOpponentAddress(opponentAddress);
+    }
     setParams((prev) => {
       const next = new URLSearchParams(prev);
       next.set('room', roomId);
       if (selectedMonster?.objectId) {
         next.set('monster', selectedMonster.objectId);
+      }
+      if (opponentAddress) {
+        next.set('opponent', opponentAddress);
       }
       return next;
     });
@@ -168,6 +177,10 @@ export function ArenaExperience() {
     if (urlRoom && urlRoom !== arena.currentRoomId) {
       arena.persistRoomId(urlRoom);
     }
+    const urlOpponent = params.get('opponent');
+    if (urlOpponent && urlOpponent !== roomOpponentAddress) {
+      setRoomOpponentAddress(urlOpponent);
+    }
 
     const urlMatch = params.get('match');
     if (!urlMatch && !urlRoom) {
@@ -203,6 +216,7 @@ export function ArenaExperience() {
     arenaMatches.persistMatchId,
     loadMatch,
     params,
+    roomOpponentAddress,
   ]);
 
   useEffect(() => {
@@ -220,12 +234,8 @@ export function ArenaExperience() {
     if (!lobbyStartedMatch?.matchId) return;
     const nextRoomId = lobbyStartedMatch.roomId || lobbyStartedMatch.matchId;
     if (nextRoomId) {
-      arena.persistRoomId(nextRoomId);
-      setParams((prev) => {
-        const next = new URLSearchParams(prev);
-        next.set('room', nextRoomId);
-        return next;
-      });
+      const opponentAddress = lobbyStartedMatch.from === account?.address ? lobbyStartedMatch.to : lobbyStartedMatch.from;
+      stageRoomEntry(nextRoomId, opponentAddress);
     }
     if (lobbyStartedMatch.matchId === arena.currentMatchId) {
       clearLobbyStartedMatch();
@@ -234,10 +244,11 @@ export function ArenaExperience() {
     void loadMatch(lobbyStartedMatch.matchId, 'room');
     toast.success(`Battle room ready with ${short(lobbyStartedMatch.from === account?.address ? lobbyStartedMatch.to : lobbyStartedMatch.from)}.`);
     clearLobbyStartedMatch();
-  }, [account?.address, arena.currentMatchId, arena.persistRoomId, clearLobbyStartedMatch, loadMatch, lobbyStartedMatch, setParams]);
+  }, [account?.address, arena.currentMatchId, clearLobbyStartedMatch, loadMatch, lobbyStartedMatch, stageRoomEntry]);
 
   useEffect(() => {
     if (!arena.currentMatchId || !activeMatch || !isRoomMessageRelevant(activeMatch, account?.address)) return;
+    setRoomOpponentAddress(activeMatch.player_a === account?.address ? activeMatch.player_b : activeMatch.player_a);
     if (activeMatch.status === 2 || resolution) {
       arena.setScreen('battle');
     }
@@ -287,14 +298,10 @@ export function ArenaExperience() {
       toast.error('Connect wallet first');
       return;
     }
-    if (!selectedMonster) {
-      toast.error('Pick a monster first');
-      return;
-    }
 
     setPending('create-room');
     const roomId = meta?.roomId || generateBattleRoomId(account.address, opponentAddress);
-    stageRoomEntry(roomId);
+    stageRoomEntry(roomId, opponentAddress);
     try {
       const tx = new Transaction();
       tx.moveCall({
@@ -320,11 +327,10 @@ export function ArenaExperience() {
       await loadMatch(matchId, 'room');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not open the room');
-      resetToLobby();
     } finally {
       setPending(null);
     }
-  }, [account?.address, executeAndFetchBlock, loadMatch, lobby, resetToLobby, selectedMonster, stageRoomEntry]);
+  }, [account?.address, executeAndFetchBlock, loadMatch, lobby, stageRoomEntry]);
 
   const handleInvite = useCallback((address: string) => {
     if (!selectedMonster) {
@@ -333,17 +339,27 @@ export function ArenaExperience() {
     }
     const roomId = generateBattleRoomId(account!.address, address);
     lobby.invitePlayer(address, roomId);
-    stageRoomEntry(roomId);
+    stageRoomEntry(roomId, address);
     toast.success(`Invite sent to ${short(address)}.`);
   }, [account, lobby, selectedMonster, stageRoomEntry]);
 
   const handleAcceptInvite = useCallback(async (invite: LobbyInvite) => {
-    await createMatchAgainst(invite.from, { inviteId: invite.id, roomId: invite.roomId });
-  }, [createMatchAgainst]);
+    lobby.acceptInvite(invite);
+    stageRoomEntry(invite.roomId, invite.from);
+    toast.success(`Joined ${short(invite.from)}'s room.`);
+  }, [lobby, stageRoomEntry]);
 
   const handleJoinOpenMatch = useCallback(async (openMatch: LobbyOpenMatch) => {
     await createMatchAgainst(openMatch.creator, { openMatchId: openMatch.id, roomId: generateBattleRoomId(account!.address, openMatch.creator) });
   }, [account, createMatchAgainst]);
+
+  const handleCreateRoomMatch = useCallback(async () => {
+    if (!roomOpponentAddress) {
+      toast.error('Waiting for the other trainer to join the room');
+      return;
+    }
+    await createMatchAgainst(roomOpponentAddress, { roomId: arena.currentRoomId || generateBattleRoomId(account!.address, roomOpponentAddress) });
+  }, [account, arena.currentRoomId, createMatchAgainst, roomOpponentAddress]);
 
   const handleDeposit = useCallback(async () => {
     if (!account?.address || !arena.currentMatchId || !selectedMonster) {
@@ -449,6 +465,12 @@ export function ArenaExperience() {
     () => arenaMatches.activeMatches.filter((match) => match.objectId !== arena.currentMatchId).slice(0, 6),
     [arena.currentMatchId, arenaMatches.activeMatches]
   );
+  const canCreateRoomMatch = useMemo(() => {
+    if (!arena.currentRoomId || arena.currentMatchId || !roomOpponentAddress) return false;
+    const visibleParticipants = room.participants.filter((participant) => participant.present);
+    return visibleParticipants.some((participant) => participant.address === account?.address)
+      && visibleParticipants.some((participant) => participant.address === roomOpponentAddress);
+  }, [account?.address, arena.currentMatchId, arena.currentRoomId, room.participants, roomOpponentAddress]);
 
   const selfPlayer = useMemo(
     () => lobby.players.find((player) => player.address === account?.address) ?? null,
@@ -555,8 +577,10 @@ export function ArenaExperience() {
           playerAMonster={playerAMonster}
           playerBMonster={playerBMonster}
           pending={pending}
+          canCreateRoomMatch={canCreateRoomMatch}
           onPickMonster={setSelectedMonsterId}
           onPickStake={setSelectedStake}
+          onCreateRoomMatch={handleCreateRoomMatch}
           onDeposit={handleDeposit}
           onWithdraw={handleWithdraw}
           onToggleReady={handleToggleReady}

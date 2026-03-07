@@ -81,6 +81,14 @@ type InviteMessage = {
   roomId?: string;
 };
 
+type InviteAcceptedMessage = {
+  type: "inviteAccepted";
+  inviteId: string;
+  from: string;
+  to: string;
+  roomId: string;
+};
+
 type MatchCreatedMessage = {
   type: "matchCreated";
   creator: string;
@@ -139,6 +147,7 @@ type ClientMessage =
   | JoinMessage
   | LeaveMessage
   | InviteMessage
+  | InviteAcceptedMessage
   | MatchCreatedMessage
   | MatchStartedMessage
   | JoinRoomMessage
@@ -288,6 +297,9 @@ export class ArenaLobby {
         return;
       case "invite":
         this.handleInvite(socket, message);
+        return;
+      case "inviteAccepted":
+        this.handleInviteAccepted(socket, message);
         return;
       case "matchCreated":
         this.handleMatchCreated(socket, message);
@@ -463,6 +475,45 @@ export class ArenaLobby {
 
     this.sendToAddress(message.to, { type: "invite", invite });
     this.sendToAddress(message.from, { type: "invite", invite });
+    this.broadcastLobbyState();
+  }
+
+  private handleInviteAccepted(socket: WebSocket, message: InviteAcceptedMessage) {
+    if (!isAddress(message.from) || !isAddress(message.to)) {
+      return;
+    }
+
+    const session = this.sessions.get(socket);
+    if (session?.address !== message.to) {
+      this.send(socket, { type: "error", message: "Invite accept sender mismatch" });
+      return;
+    }
+
+    const invite = this.invites.get(message.inviteId);
+    if (!invite) {
+      return;
+    }
+
+    if (invite.from !== message.from || invite.to !== message.to) {
+      this.send(socket, { type: "error", message: "Invite accept payload mismatch" });
+      return;
+    }
+
+    invite.status = "accepted";
+    this.invites.delete(message.inviteId);
+
+    const accepted = {
+      id: nextId("invite_accept"),
+      inviteId: message.inviteId,
+      from: message.from,
+      to: message.to,
+      roomId: message.roomId,
+      acceptedAt: Date.now(),
+    };
+
+    this.pushRecent(`${short(message.to)} accepted ${short(message.from)}'s invite.`);
+    this.sendToAddress(message.from, { type: "inviteAccepted", accepted });
+    this.sendToAddress(message.to, { type: "inviteAccepted", accepted });
     this.broadcastLobbyState();
   }
 

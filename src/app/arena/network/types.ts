@@ -45,6 +45,15 @@ export type StartedMatch = {
   startedAt: number;
 };
 
+export type InviteAccepted = {
+  id: string;
+  inviteId: string;
+  from: string;
+  to: string;
+  roomId: string;
+  acceptedAt: number;
+};
+
 export type RoomParticipant = {
   address: string;
   joinedAt: number;
