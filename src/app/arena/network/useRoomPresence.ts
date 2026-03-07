@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { buildArenaSocketUrl } from './socket';
+import { buildArenaSocketUrlCandidates } from './socket';
 import type { LobbyConnectionState, RoomChatMessage, RoomNotice, RoomParticipant, RoomState } from './types';
 
 type UseRoomPresenceOptions = {
@@ -46,7 +46,8 @@ export function useRoomPresence({ enabled, roomId, address, spectator = false }:
   const reconnectTimerRef = useRef<number | null>(null);
   const pingTimerRef = useRef<number | null>(null);
   const viewerIdRef = useRef('');
-  const endpoint = useMemo(() => (roomId ? buildArenaSocketUrl(`/ws/room/${roomId}`) : ''), [roomId]);
+  const endpointIndexRef = useRef(0);
+  const endpoints = useMemo(() => (roomId ? buildArenaSocketUrlCandidates(`/ws/room/${roomId}`) : []), [roomId]);
 
   if (!viewerIdRef.current) {
     viewerIdRef.current = ensureViewerId();
@@ -85,13 +86,17 @@ export function useRoomPresence({ enabled, roomId, address, spectator = false }:
     }
 
     closedRef.current = false;
+    endpointIndexRef.current = 0;
 
     const connect = () => {
+      const endpoint = endpoints[Math.min(endpointIndexRef.current, endpoints.length - 1)] ?? '';
+      let opened = false;
       setConnectionState('connecting');
       const socket = new WebSocket(endpoint);
       socketRef.current = socket;
 
       socket.addEventListener('open', () => {
+        opened = true;
         setConnectionState('open');
         setLastError(null);
         if (spectator || !address) {
@@ -133,13 +138,17 @@ export function useRoomPresence({ enabled, roomId, address, spectator = false }:
           setConnectionState('closed');
           return;
         }
+        if (!opened && endpointIndexRef.current < endpoints.length - 1) {
+          endpointIndexRef.current += 1;
+          reconnectTimerRef.current = window.setTimeout(connect, 120);
+          return;
+        }
         setConnectionState('error');
         reconnectTimerRef.current = window.setTimeout(connect, RECONNECT_MS);
       });
 
       socket.addEventListener('error', () => {
         setLastError(`Room socket failed: ${endpoint}`);
-        setConnectionState('error');
       });
     };
 
@@ -156,7 +165,7 @@ export function useRoomPresence({ enabled, roomId, address, spectator = false }:
       socketRef.current?.close();
       socketRef.current = null;
     };
-  }, [address, cleanupTimers, enabled, endpoint, roomId, send, spectator]);
+  }, [address, cleanupTimers, enabled, endpoints, roomId, send, spectator]);
 
   const setSelection = useCallback(
     (input: { monsterId?: string; monsterName?: string; stage?: number }) => {
@@ -191,7 +200,7 @@ export function useRoomPresence({ enabled, roomId, address, spectator = false }:
   );
 
   return {
-    endpoint,
+    endpoint: endpoints[Math.min(endpointIndexRef.current, Math.max(0, endpoints.length - 1))] ?? '',
     connectionState,
     isConnected: connectionState === 'open',
     participants,

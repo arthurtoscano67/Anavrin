@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { buildArenaSocketUrl } from './socket';
+import { buildArenaSocketUrlCandidates } from './socket';
 import type {
   InviteAccepted,
   LobbyConnectionState,
@@ -50,7 +50,8 @@ export function useLobbyPresence({ enabled, address, monsterName = 'Legend', lev
   const closedRef = useRef(false);
   const reconnectTimerRef = useRef<number | null>(null);
   const pingTimerRef = useRef<number | null>(null);
-  const endpoint = useMemo(() => buildArenaSocketUrl('/ws/lobby'), []);
+  const endpointIndexRef = useRef(0);
+  const endpoints = useMemo(() => buildArenaSocketUrlCandidates('/ws/lobby'), []);
 
   const send = useCallback((payload: Record<string, unknown>) => {
     const socket = socketRef.current;
@@ -80,13 +81,17 @@ export function useLobbyPresence({ enabled, address, monsterName = 'Legend', lev
     }
 
     closedRef.current = false;
+    endpointIndexRef.current = 0;
 
     const connect = () => {
+      const endpoint = endpoints[Math.min(endpointIndexRef.current, endpoints.length - 1)] ?? endpoints[0];
+      let opened = false;
       setConnectionState('connecting');
       const socket = new WebSocket(endpoint);
       socketRef.current = socket;
 
       socket.addEventListener('open', () => {
+        opened = true;
         setConnectionState('open');
         setLastError(null);
         socket.send(
@@ -150,13 +155,17 @@ export function useLobbyPresence({ enabled, address, monsterName = 'Legend', lev
           setConnectionState('closed');
           return;
         }
+        if (!opened && endpointIndexRef.current < endpoints.length - 1) {
+          endpointIndexRef.current += 1;
+          reconnectTimerRef.current = window.setTimeout(connect, 120);
+          return;
+        }
         setConnectionState('error');
         reconnectTimerRef.current = window.setTimeout(connect, RECONNECT_MS);
       });
 
       socket.addEventListener('error', () => {
         setLastError(`Lobby socket failed: ${endpoint}`);
-        setConnectionState('error');
       });
     };
 
@@ -169,7 +178,7 @@ export function useLobbyPresence({ enabled, address, monsterName = 'Legend', lev
       socketRef.current?.close();
       socketRef.current = null;
     };
-  }, [address, cleanupTimers, enabled, endpoint, level, monsterName, send]);
+  }, [address, cleanupTimers, enabled, endpoints, level, monsterName, send]);
 
   const invitePlayer = useCallback(
     (to: string, roomId: string) => {
@@ -249,7 +258,7 @@ export function useLobbyPresence({ enabled, address, monsterName = 'Legend', lev
   }, []);
 
   return {
-    endpoint,
+    endpoint: endpoints[Math.min(endpointIndexRef.current, Math.max(0, endpoints.length - 1))] ?? '',
     connectionState,
     isConnected: connectionState === 'open',
     players,

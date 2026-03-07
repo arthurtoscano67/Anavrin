@@ -16,7 +16,7 @@ function configuredBaseUrl() {
   return url;
 }
 
-export function buildArenaSocketUrl(path: string): string {
+function buildSocketUrlFromPath(path: string): string {
   const configured = configuredBaseUrl();
 
   if (configured) {
@@ -31,6 +31,25 @@ export function buildArenaSocketUrl(path: string): string {
   }
 
   return `ws://127.0.0.1:8787${path}`;
+}
+
+function legacySocketPath(path: string): string | null {
+  if (path === '/ws/lobby') return '/lobby';
+  if (path.startsWith('/ws/room/')) return path.replace('/ws/room/', '/room/');
+  return null;
+}
+
+export function buildArenaSocketUrlCandidates(path: string): string[] {
+  const urls = [buildSocketUrlFromPath(path)];
+  const legacyPath = legacySocketPath(path);
+  if (legacyPath) {
+    urls.push(buildSocketUrlFromPath(legacyPath));
+  }
+  return [...new Set(urls)];
+}
+
+export function buildArenaSocketUrl(path: string): string {
+  return buildArenaSocketUrlCandidates(path)[0];
 }
 
 export function buildArenaHttpUrl(path: string): string {
