@@ -162,6 +162,7 @@ const MAX_RECENT_MATCHES = 20;
 const MAX_INVITES = 200;
 const MAX_ROOM_NOTICES = 18;
 const ROOM_STATE_KEY = "roomState";
+const ONLINE_WINDOW_MS = 20_000;
 
 function toJson(data: unknown): string {
   return JSON.stringify(data);
@@ -702,6 +703,33 @@ export class ArenaLobby {
     participant.present = true;
   }
 
+  private sweepLobbyPresence(now = Date.now()) {
+    for (const [address, player] of this.players) {
+      if (now - player.lastSeen < ONLINE_WINDOW_MS) continue;
+      if (this.hasActiveLobbySessionForAddress(address)) continue;
+      this.removeAddressState(address);
+    }
+  }
+
+  private sweepRoomPresence(now = Date.now()) {
+    let changed = false;
+
+    for (const [address, participant] of this.roomParticipants) {
+      const online = this.hasActiveRoomSessionForAddress(address) || now - participant.lastSeen < ONLINE_WINDOW_MS;
+      if (participant.present !== online) {
+        participant.present = online;
+        if (!online && participant.ready) {
+          participant.ready = false;
+        }
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      this.persistRoomState();
+    }
+  }
+
   private pushRecent(summary: string) {
     const item: RecentMatch = {
       id: nextId("recent"),
@@ -728,18 +756,21 @@ export class ArenaLobby {
   }
 
   private broadcastLobbyState() {
+    this.sweepLobbyPresence();
     for (const socket of this.sessions.keys()) {
       this.sendLobbyState(socket);
     }
   }
 
   private broadcastRoomState() {
+    this.sweepRoomPresence();
     for (const socket of this.roomSessions.keys()) {
       this.sendRoomState(socket);
     }
   }
 
   private sendLobbyState(socket: WebSocket) {
+    this.sweepLobbyPresence();
     const session = this.sessions.get(socket);
     const address = session?.address;
 
@@ -751,7 +782,9 @@ export class ArenaLobby {
 
     this.send(socket, {
       type: "lobbyState",
-      players: [...this.players.values()].sort((a, b) => b.lastSeen - a.lastSeen),
+      players: [...this.players.values()]
+        .filter((player) => Date.now() - player.lastSeen < ONLINE_WINDOW_MS)
+        .sort((a, b) => b.lastSeen - a.lastSeen),
       openMatches: [...this.openMatches.values()].sort((a, b) => b.createdAt - a.createdAt),
       recentMatches: this.recentMatches,
       invites,
@@ -760,6 +793,7 @@ export class ArenaLobby {
   }
 
   private sendRoomState(socket: WebSocket) {
+    this.sweepRoomPresence();
     const participants = [...this.roomParticipants.values()].sort((a, b) => a.joinedAt - b.joinedAt);
     this.send(socket, {
       type: "roomState",

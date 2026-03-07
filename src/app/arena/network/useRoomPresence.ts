@@ -16,7 +16,7 @@ type RoomEnvelope = {
 };
 
 const RECONNECT_MS = 1800;
-const PING_MS = 10_000;
+const PING_MS = 5_000;
 
 export function useRoomPresence({ enabled, roomId, address }: UseRoomPresenceOptions) {
   const [connectionState, setConnectionState] = useState<LobbyConnectionState>('closed');

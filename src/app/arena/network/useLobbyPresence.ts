@@ -29,7 +29,7 @@ type LobbyEnvelope = {
 };
 
 const RECONNECT_MS = 1800;
-const PING_MS = 10_000;
+const PING_MS = 5_000;
 
 export function useLobbyPresence({ enabled, address, monsterName = 'Legend', level = 1 }: UseLobbyPresenceOptions) {
   const [connectionState, setConnectionState] = useState<LobbyConnectionState>('closed');
