@@ -171,6 +171,9 @@ export function ArenaExperience() {
 
     const urlMatch = params.get('match');
     if (!urlMatch && !urlRoom) {
+      if (arena.currentMatchId || arena.currentRoomId) {
+        return;
+      }
       setActiveMatch(null);
       setResolution(null);
       arena.setCurrentMatchId('');
@@ -180,12 +183,27 @@ export function ArenaExperience() {
       return;
     }
 
+    if (urlRoom && !urlMatch && arena.screen !== 'room') {
+      arena.setScreen('room');
+    }
+
     if (urlMatch && activeMatch?.objectId !== urlMatch) {
       arena.setCurrentMatchId(urlMatch);
       void loadMatch(urlMatch, 'room');
       return;
     }
-  }, [activeMatch?.objectId, arena, arenaMatches.persistMatchId, loadMatch, params]);
+  }, [
+    activeMatch?.objectId,
+    arena.currentMatchId,
+    arena.currentRoomId,
+    arena.screen,
+    arena.persistRoomId,
+    arena.setCurrentMatchId,
+    arena.setScreen,
+    arenaMatches.persistMatchId,
+    loadMatch,
+    params,
+  ]);
 
   useEffect(() => {
     if (!arena.currentMatchId || activeMatch?.objectId === arena.currentMatchId) return;
@@ -196,7 +214,7 @@ export function ArenaExperience() {
     if (arena.currentRoomId) return;
     if (!arena.currentMatchId) return;
     arena.persistRoomId(arena.currentMatchId);
-  }, [arena]);
+  }, [arena.currentMatchId, arena.currentRoomId, arena.persistRoomId]);
 
   useEffect(() => {
     if (!lobbyStartedMatch?.matchId) return;
@@ -216,14 +234,14 @@ export function ArenaExperience() {
     void loadMatch(lobbyStartedMatch.matchId, 'room');
     toast.success(`Battle room ready with ${short(lobbyStartedMatch.from === account?.address ? lobbyStartedMatch.to : lobbyStartedMatch.from)}.`);
     clearLobbyStartedMatch();
-  }, [account?.address, arena, clearLobbyStartedMatch, loadMatch, lobbyStartedMatch, setParams]);
+  }, [account?.address, arena.currentMatchId, arena.persistRoomId, clearLobbyStartedMatch, loadMatch, lobbyStartedMatch, setParams]);
 
   useEffect(() => {
     if (!arena.currentMatchId || !activeMatch || !isRoomMessageRelevant(activeMatch, account?.address)) return;
     if (activeMatch.status === 2 || resolution) {
       arena.setScreen('battle');
     }
-  }, [account?.address, activeMatch, arena, resolution]);
+  }, [account?.address, activeMatch, arena.currentMatchId, arena.setScreen, resolution]);
 
   const roomModel = useMemo(
     () => buildRoomModel({
