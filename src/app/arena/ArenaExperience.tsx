@@ -108,6 +108,19 @@ export function ArenaExperience() {
     });
   }, [arena, arenaMatches.persistMatchId, setParams]);
 
+  const stageRoomEntry = useCallback((roomId: string) => {
+    arena.persistRoomId(roomId);
+    arena.setScreen('room');
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('room', roomId);
+      if (selectedMonster?.objectId) {
+        next.set('monster', selectedMonster.objectId);
+      }
+      return next;
+    });
+  }, [arena, selectedMonster?.objectId, setParams]);
+
   useEffect(() => {
     if (!selectedMonster || !roomIsConnected) return;
     roomSetSelection({
@@ -262,6 +275,8 @@ export function ArenaExperience() {
     }
 
     setPending('create-room');
+    const roomId = meta?.roomId || generateBattleRoomId(account.address, opponentAddress);
+    stageRoomEntry(roomId);
     try {
       const tx = new Transaction();
       tx.moveCall({
@@ -276,8 +291,6 @@ export function ArenaExperience() {
       }
 
       const matchId = created.objectId;
-      const roomId = meta?.roomId || generateBattleRoomId(account.address, opponentAddress);
-      arena.persistRoomId(roomId);
       lobby.announceMatchStarted({
         from: account.address,
         to: opponentAddress,
@@ -286,16 +299,14 @@ export function ArenaExperience() {
         openMatchId: meta?.openMatchId,
         matchId,
       });
-      setParams((prev) => {
-        const next = new URLSearchParams(prev);
-        next.set('room', roomId);
-        return next;
-      });
       await loadMatch(matchId, 'room');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not open the room');
+      resetToLobby();
     } finally {
       setPending(null);
     }
-  }, [account?.address, arena, executeAndFetchBlock, loadMatch, lobby, selectedMonster, setParams]);
+  }, [account?.address, executeAndFetchBlock, loadMatch, lobby, resetToLobby, selectedMonster, stageRoomEntry]);
 
   const handleInvite = useCallback((address: string) => {
     if (!selectedMonster) {
@@ -304,16 +315,9 @@ export function ArenaExperience() {
     }
     const roomId = generateBattleRoomId(account!.address, address);
     lobby.invitePlayer(address, roomId);
-    arena.persistRoomId(roomId);
-    setParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.set('room', roomId);
-      next.set('monster', selectedMonster.objectId);
-      return next;
-    });
-    arena.setScreen('room');
+    stageRoomEntry(roomId);
     toast.success(`Invite sent to ${short(address)}.`);
-  }, [account, arena, lobby, selectedMonster, setParams]);
+  }, [account, lobby, selectedMonster, stageRoomEntry]);
 
   const handleAcceptInvite = useCallback(async (invite: LobbyInvite) => {
     await createMatchAgainst(invite.from, { inviteId: invite.id, roomId: invite.roomId });
