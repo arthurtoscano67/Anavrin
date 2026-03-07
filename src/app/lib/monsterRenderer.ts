@@ -94,7 +94,7 @@ export function normalizeProceduralMonster(input: ProceduralMonsterInput): Proce
   return {
     objectId: input.objectId,
     seed: String(input.seed ?? hashString(input.objectId)),
-    name: String(input.name ?? "Anavrin Legend"),
+    name: String(input.name ?? "Martian"),
     stage: clampStage(input.stage),
     attack: Number(input.attack ?? 0),
     defense: Number(input.defense ?? 0),

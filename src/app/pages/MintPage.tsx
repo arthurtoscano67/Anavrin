@@ -40,7 +40,7 @@ export function MintPage() {
         arguments: [tx.object(TREASURY_ID), tx.object(CLOCK_ID), coin],
       });
 
-      const { block } = await executeAndFetchBlock(tx, "Legend minted");
+      const { block } = await executeAndFetchBlock(tx, "Martian minted");
       const createdMonster = block.objectChanges?.find(
         (c) => c.type === "created" && c.objectType === MONSTER_TYPE
       );
@@ -60,8 +60,8 @@ export function MintPage() {
 
   return (
     <PageShell
-      title="Mint A Living Legend"
-      subtitle="Mint directly on Sui mainnet. Stage evolves with time, and traits update on-chain via heartbeat/hatch/evolve."
+      title="Mint A Martian"
+      subtitle="Mint directly on Sui mainnet. Forms evolve over time, and traits update on-chain via sync_stage."
     >
       <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
         <div className="glass-card space-y-4 p-5">
@@ -79,7 +79,7 @@ export function MintPage() {
 
         <div className="glass-card space-y-5 p-5">
           <div className="space-y-2">
-            <div className="text-xs uppercase tracking-wider text-gray-400">Treasury Config</div>
+            <div className="text-xs uppercase tracking-wider text-gray-400">Game Config</div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-300">Mint Price</span>
               <span className="text-xl font-bold text-cyan">{toSui(treasury.data?.mint_price_mist)} SUI</span>
@@ -94,7 +94,7 @@ export function MintPage() {
 
           {!account && (
             <div className="rounded-xl border border-purple/40 bg-purple/15 p-3 text-sm text-purple-100">
-              Connect wallet to mint your first Anavrin Legend.
+              Connect wallet to mint your first Martian.
             </div>
           )}
 

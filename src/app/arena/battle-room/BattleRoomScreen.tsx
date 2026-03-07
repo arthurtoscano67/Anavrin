@@ -103,7 +103,7 @@ export function BattleRoomScreen({
     () => [
       'I will open the room.',
       'You open the room.',
-      'Deposit your legend now.',
+      'Deposit your Martian now.',
       'I am ready to battle.',
       'Withdraw if you want to switch.',
     ],
@@ -137,7 +137,7 @@ export function BattleRoomScreen({
       return {
         eyebrow: 'Complete',
         title: 'Battle finished.',
-        body: 'The fight resolved on-chain and the legends are back in their wallets.',
+        body: 'The fight resolved on-chain and the Martians are back in their wallets.',
         primaryLabel: 'Back To Lobby',
         primaryAction: onBackLobby,
         primaryDisabled: actionDisabled,
@@ -151,7 +151,7 @@ export function BattleRoomScreen({
       return {
         eyebrow: 'Cancelled',
         title: 'Room cancelled.',
-        body: 'The contract cancelled this room. Legends should already be back with their trainers.',
+        body: 'The contract cancelled this room. Martians should already be back with their trainers.',
         primaryLabel: 'Back To Lobby',
         primaryAction: onBackLobby,
         primaryDisabled: actionDisabled,
@@ -166,7 +166,7 @@ export function BattleRoomScreen({
         return {
           eyebrow: 'Step 1',
           title: 'Open the battle pool.',
-          body: 'Both trainers are here. Tap once to create the on-chain ArenaMatch object.',
+          body: 'Both fighters are here. Tap once to create the on-chain MartianMatch object.',
           primaryLabel: pending === 'create-room' ? 'Opening...' : 'Open Battle Room',
           primaryAction: onCreateRoomMatch,
           primaryDisabled: actionDisabled,
@@ -191,15 +191,15 @@ export function BattleRoomScreen({
     if (!roomModel.playerDeposited) {
       return {
         eyebrow: 'Step 2',
-        title: selectedMonster ? 'Deposit your legend.' : 'Pick your legend first.',
+        title: selectedMonster ? 'Deposit your Martian.' : 'Pick your Martian first.',
         body: selectedMonster
           ? `${selectedMonster.name} is selected. Deposit now${selectedStake !== '0' ? ` with ${selectedStake} SUI` : ''}.`
-          : 'Choose a legend below, then deposit it into the battle pool.',
-        primaryLabel: pending === 'deposit' ? 'Depositing...' : 'Deposit Legend',
+          : 'Choose a Martian below, then deposit it into the battle pool.',
+        primaryLabel: pending === 'deposit' ? 'Depositing...' : 'Deposit Martian',
         primaryAction: onDeposit,
         primaryDisabled: actionDisabled || !roomModel.canDeposit,
         primaryTone: 'from-cyan to-purple',
-        statusLabel: roomModel.canDeposit ? 'Your Turn' : 'Pick Legend',
+        statusLabel: roomModel.canDeposit ? 'Your Turn' : 'Pick Martian',
         statusTone: roomModel.canDeposit ? 'border-cyan/30 bg-cyan/10 text-cyan-50' : 'border-white/10 bg-white/5 text-gray-200',
       };
     }
@@ -209,8 +209,8 @@ export function BattleRoomScreen({
         eyebrow: 'Step 2',
         title: 'Waiting for opponent deposit.',
         body: roomModel.canWithdraw
-          ? 'Your legend is in the pool. Withdraw is still available for safety until the other trainer deposits.'
-          : 'Your legend is in the pool. Waiting for the other trainer to deposit theirs.',
+          ? 'Your Martian is in the pool. Withdraw is still available for safety until the other trainer deposits.'
+          : 'Your Martian is in the pool. Waiting for the other trainer to deposit theirs.',
         primaryLabel: 'Waiting for Opponent',
         primaryDisabled: true,
         primaryTone: 'from-slate-700 to-slate-600',
@@ -223,7 +223,7 @@ export function BattleRoomScreen({
       return {
         eyebrow: 'Step 3',
         title: 'Battle now.',
-        body: 'Both legends are deposited and the match is locked. Either trainer can start the battle.',
+        body: 'Both Martians are deposited and the match is locked. Either trainer can start the battle.',
         primaryLabel: pending === 'battle' ? 'Battling...' : 'Battle Now',
         primaryAction: onBattle,
         primaryDisabled: actionDisabled,
@@ -335,7 +335,7 @@ export function BattleRoomScreen({
         {roomModel.canStartBattle ? (
           <div className="relative z-10 mb-4 rounded-[24px] border border-fuchsia-300/30 bg-fuchsia-500/12 px-4 py-4 text-center arena-ready-glow">
             <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-fuchsia-100/80">Battle Ready</div>
-            <div className="mt-2 text-xl font-black text-white">Both legends are in. Either trainer can start the battle now.</div>
+            <div className="mt-2 text-xl font-black text-white">Both Martians are in. Either trainer can start the battle now.</div>
           </div>
         ) : null}
 
@@ -418,7 +418,7 @@ export function BattleRoomScreen({
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-[20px] border border-white/10 bg-black/20 px-4 py-3">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">Legend</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">Martian</div>
               <div className="mt-2 text-lg font-black text-white">
                 {roomModel.playerDeposited
                   ? (roomModel.playerSide === 'a' ? playerAMonster?.name : playerBMonster?.name) ?? 'Deposited'
@@ -442,7 +442,7 @@ export function BattleRoomScreen({
             </div>
           ) : roomModel.playerDeposited ? (
             <div className="rounded-[18px] border border-white/10 bg-white/5 px-4 py-3 text-sm text-gray-300">
-              Your legend is already locked into the pool. Withdraw closes once both legends are deposited because the contract locks the match.
+              Your Martian is already locked into the pool. Withdraw closes once both Martians are deposited because the contract locks the match.
             </div>
           ) : null}
         </section>

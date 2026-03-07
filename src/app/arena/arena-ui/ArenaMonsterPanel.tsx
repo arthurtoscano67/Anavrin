@@ -74,7 +74,7 @@ export function ArenaMonsterPanel({
           </div>
         ) : (
           <div className="mx-auto grid h-48 w-48 place-items-center rounded-full border border-dashed border-white/15 bg-white/5 text-center text-lg font-semibold text-gray-400">
-            Legend not loaded
+            Martian not loaded
           </div>
         )}
       </div>

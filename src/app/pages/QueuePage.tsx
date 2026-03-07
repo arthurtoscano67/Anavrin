@@ -11,7 +11,7 @@ import { useAnavrinData } from '../hooks/useAnavrinData';
 import { useArenaMatches } from '../hooks/useArenaMatches';
 import { useTxExecutor } from '../hooks/useTxExecutor';
 import { useLobbyPresence } from '../arena/network/useLobbyPresence';
-import { CLOCK_ID, MODULE, PACKAGE_ID } from '../lib/constants';
+import { CLOCK_ID, MODULE, NORMAL_BATTLE_MODE, PACKAGE_ID, TREASURY_ID } from '../lib/constants';
 import { short } from '../lib/format';
 import { extractCreatedArenaMatchId } from '../lib/sui';
 
@@ -53,7 +53,7 @@ export function QueuePage() {
   const lobby = useLobbyPresence({
     enabled: Boolean(account?.address),
     address: account?.address,
-    monsterName: selectedMonster?.name ?? 'Legend',
+    monsterName: selectedMonster?.name ?? 'Martian',
     level: (selectedMonster?.stage ?? 0) + 1,
   });
 
@@ -97,13 +97,13 @@ export function QueuePage() {
         const tx = new Transaction();
         tx.moveCall({
           target: `${PACKAGE_ID}::${MODULE}::create_match`,
-          arguments: [tx.pure.address(opponent), tx.object(CLOCK_ID)],
+          arguments: [tx.object(TREASURY_ID), tx.object(CLOCK_ID), tx.pure.address(opponent), tx.pure.u8(NORMAL_BATTLE_MODE)],
         });
 
         const { block } = await executeAndFetchBlock(tx, 'Queue match created');
         const matchId = extractCreatedArenaMatchId(block);
         if (!matchId) {
-          throw new Error('Could not find the new ArenaMatch object');
+          throw new Error('Could not find the new MartianMatch object');
         }
 
         lobby.announceMatchStarted({
@@ -133,7 +133,7 @@ export function QueuePage() {
 
   const handleJoinQueue = () => {
     if (!selectedMonster) {
-      toast.error('Pick a legend first');
+      toast.error('Pick a Martian first');
       return;
     }
 
@@ -163,14 +163,14 @@ export function QueuePage() {
   }
 
   return (
-    <PageShell title="Queue" subtitle="Select one legend, choose a wager, and wait for a compatible trainer.">
+    <PageShell title="Queue" subtitle="Select one Martian, choose a wager, and wait for a compatible fighter.">
       <section className="glass-card space-y-4 p-5 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Quick Match</div>
             <div className="mt-2 text-3xl font-black text-white">Find a battle automatically</div>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-300">
-              The realtime service pairs trainers with the same wager. Once matched, one wallet opens the ArenaMatch and both users move into the battle room.
+              The realtime service pairs fighters with the same wager. Once matched, one wallet opens the on-chain MartianMatch and both users move into the battle room.
             </p>
           </div>
           <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-gray-200">

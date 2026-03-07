@@ -15,7 +15,7 @@ import { useTxExecutor } from '../hooks/useTxExecutor';
 import { fetchBattleList } from '../arena/network/api';
 import { useLobbyPresence } from '../arena/network/useLobbyPresence';
 import type { BattleListKind, BattleSummary, LobbyInvite, LobbyPlayer } from '../arena/network/types';
-import { ARENA_MATCH_TYPE, CLOCK_ID, MODULE, PACKAGE_ID } from '../lib/constants';
+import { ARENA_MATCH_TYPE, CLOCK_ID, MODULE, NORMAL_BATTLE_MODE, PACKAGE_ID, TREASURY_ID } from '../lib/constants';
 import { short, toSui } from '../lib/format';
 import { extractCreatedArenaMatchId } from '../lib/sui';
 
@@ -157,7 +157,7 @@ export function LobbyPage() {
   const lobby = useLobbyPresence({
     enabled: Boolean(account?.address),
     address: account?.address,
-    monsterName: selectedMonster?.name ?? 'Legend',
+    monsterName: selectedMonster?.name ?? 'Martian',
     level: (selectedMonster?.stage ?? 0) + 1,
   });
 
@@ -186,7 +186,7 @@ export function LobbyPage() {
 
   const handleInvite = (address: string) => {
     if (!selectedMonster) {
-      toast.error('Pick a legend first');
+      toast.error('Pick a Martian first');
       return;
     }
     lobby.invitePlayer(address, '');
@@ -200,13 +200,13 @@ export function LobbyPage() {
       const tx = new Transaction();
       tx.moveCall({
         target: `${PACKAGE_ID}::${MODULE}::create_match`,
-        arguments: [tx.pure.address(invite.from), tx.object(CLOCK_ID)],
+        arguments: [tx.object(TREASURY_ID), tx.object(CLOCK_ID), tx.pure.address(invite.from), tx.pure.u8(NORMAL_BATTLE_MODE)],
       });
 
       const { block } = await executeAndFetchBlock(tx, 'Battle room created');
       const matchId = extractCreatedArenaMatchId(block);
       if (!matchId) {
-        throw new Error('Could not find the new ArenaMatch object');
+        throw new Error('Could not find the new MartianMatch object');
       }
 
       lobby.acceptInvite(invite);
@@ -237,7 +237,7 @@ export function LobbyPage() {
       <section className="glass-card space-y-4 p-5 sm:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan/80">Anavrin Legends</div>
+            <div className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan/80">Martians</div>
             <h2 className="mt-2 text-4xl font-black tracking-tight text-white sm:text-5xl">Battle Lobby</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-300">
               Invite a trainer directly or jump into quick match. If you already have an active battle, the site sends you back there automatically.
@@ -281,7 +281,7 @@ export function LobbyPage() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Quick Match</div>
-            <div className="mt-1 text-2xl font-black text-white">Pick your queue legend</div>
+            <div className="mt-1 text-2xl font-black text-white">Pick your queue Martian</div>
           </div>
           <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-gray-200">
             Queue heartbeat updates every 5s

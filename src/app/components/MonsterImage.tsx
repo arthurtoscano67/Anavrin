@@ -22,7 +22,7 @@ function toVisualInput(
     return {
       objectId,
       stage: 0,
-      name: "Anavrin Legend",
+      name: "Martian",
     };
   }
 
@@ -86,7 +86,7 @@ export function MonsterImage({ objectId, className = "", monster = null }: Monst
           objectId,
           seed: current.seed,
           stage: objectStage ?? current.stage ?? 0,
-          name: objectName ?? current.name ?? "Anavrin Legend",
+          name: objectName ?? current.name ?? "Martian",
           attack: current.attack,
           defense: current.defense,
           speed: current.speed,

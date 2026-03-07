@@ -39,14 +39,14 @@ function StaticFallbackStage({
         {leftMonster?.objectId ? (
           <MonsterImage objectId={leftMonster.objectId} monster={leftMonster as any} className="aspect-square h-full w-full" />
         ) : (
-          <div className="grid h-full min-h-[220px] place-items-center rounded-[20px] border border-dashed border-white/10 text-sm text-white/40">Waiting for Legend</div>
+          <div className="grid h-full min-h-[220px] place-items-center rounded-[20px] border border-dashed border-white/10 text-sm text-white/40">Waiting for Martian</div>
         )}
       </div>
       <div className="rounded-[24px] border border-white/10 bg-black/25 p-3">
         {rightMonster?.objectId ? (
           <MonsterImage objectId={rightMonster.objectId} monster={rightMonster as any} className="aspect-square h-full w-full" />
         ) : (
-          <div className="grid h-full min-h-[220px] place-items-center rounded-[20px] border border-dashed border-white/10 text-sm text-white/40">Waiting for Legend</div>
+          <div className="grid h-full min-h-[220px] place-items-center rounded-[20px] border border-dashed border-white/10 text-sm text-white/40">Waiting for Martian</div>
         )}
       </div>
       <div className="pointer-events-none absolute inset-x-0 bottom-5 grid place-items-center text-4xl font-black text-yellow-100/80 sm:text-6xl">VS</div>
@@ -123,12 +123,12 @@ export function BattleArenaScreen({
 
   const winnerName = winnerMonster?.name
     ?? (resolution?.winner === match.player_a ? match.monster_a_data?.name : match.monster_b_data?.name)
-    ?? 'Champion Legend';
+    ?? 'Champion Martian';
 
   const battleLog = resolution
     ? `${short(resolution.winner)} wins! Payout: ${toSui(resolution.totalPayoutMist)} SUI`
     : currentFrame?.label ?? (canAttack
-      ? `What will ${myMonster?.name ?? 'your Legend'} do?`
+      ? `What will ${myMonster?.name ?? 'your Martian'} do?`
       : 'Waiting for both players…');
 
   const leftPose = resolvePose({ side: 'left', actor: currentFrame?.actor, winnerSide, animating });
@@ -164,7 +164,7 @@ export function BattleArenaScreen({
         </div>
         <div className="absolute bottom-4 right-4 z-20 w-[13rem] max-w-[52vw] sm:w-56">
           <PokeHpPanel
-            name={myMonster?.name ?? 'Your Legend'}
+            name={myMonster?.name ?? 'Your Martian'}
             stage={myMonster?.stage ?? 0}
             hpPct={myHp}
             showHpNumber
@@ -219,7 +219,7 @@ export function BattleArenaScreen({
 
             <div className="space-y-3">
               <div>
-                <div className="text-[10px] font-bold uppercase tracking-widest text-white/40">Champion Legend</div>
+                <div className="text-[10px] font-bold uppercase tracking-widest text-white/40">Champion Martian</div>
                 <div className="mt-1 text-2xl font-black text-yellow-100">{winnerName}</div>
                 <div className="mt-1 text-sm font-semibold text-green-300">{short(resolution.winner)} wins the battle</div>
               </div>

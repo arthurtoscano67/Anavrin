@@ -34,7 +34,7 @@ export function MarketplacePage() {
 
     const cap = kioskCaps.data?.[0];
     if (!cap) {
-      toast.error("You need a kiosk owner cap to receive marketplace purchases. Create a kiosk in My Legends first.");
+      toast.error("You need a kiosk owner cap to receive marketplace purchases. Create a kiosk in My Martians first.");
       return;
     }
 
@@ -76,17 +76,17 @@ export function MarketplacePage() {
   return (
     <PageShell
       title="Marketplace"
-      subtitle="Live kiosk listings for Anavrin Legends. Buy flow uses Sui kiosk transactions on mainnet."
+      subtitle="Live kiosk listings for Martians. Buy flow uses Sui kiosk transactions on mainnet."
     >
       {!account && (
         <div className="glass-card p-4 text-sm text-gray-300">
-          Connect wallet to buy listed monsters.
+          Connect wallet to buy listed Martians.
         </div>
       )}
 
       {account && (kioskCaps.data?.length ?? 0) === 0 && (
         <div className="glass-card rounded-xl border border-yellow-400/40 bg-yellow-500/10 p-4 text-sm text-yellow-100">
-          You have no kiosk owner cap. Buying from kiosk requires one. Create a kiosk on My Legends first.
+          You have no kiosk owner cap. Buying from kiosk requires one. Create a kiosk on My Martians first.
         </div>
       )}
 
@@ -94,7 +94,7 @@ export function MarketplacePage() {
         <LoadingGrid count={8} />
       ) : (listedMonsters.data ?? []).length === 0 ? (
         <div className="glass-card p-5 text-sm text-gray-300">
-          No active listings found for `Monster` currently.
+          No active listings found for `Martian` currently.
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

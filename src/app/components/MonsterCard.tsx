@@ -10,7 +10,7 @@ export function MonsterCard({
   monster,
   actions,
   arenaDisabled = false,
-  arenaLabel = "Send To Arena",
+  arenaLabel = "Send To Battle",
 }: {
   monster: Monster;
   actions?: React.ReactNode;
@@ -63,7 +63,7 @@ export function MonsterCard({
           </button>
         ) : (
           <Link
-            to={`/arena?monster=${monster.objectId}`}
+            to={`/lobby?monster=${monster.objectId}`}
             className="btn-ghost w-full text-center text-xs"
           >
             {arenaLabel}

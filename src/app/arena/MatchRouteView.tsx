@@ -142,7 +142,7 @@ export function MatchRouteView({ matchId, spectatorOnly = false }: MatchRouteVie
 
   const handleDeposit = useCallback(async () => {
     if (!account?.address || !matchId || !selectedMonster || !match || !isParticipant) {
-      toast.error('Pick a legend first');
+      toast.error('Pick a Martian first');
       return;
     }
 
@@ -150,8 +150,8 @@ export function MatchRouteView({ matchId, spectatorOnly = false }: MatchRouteVie
     try {
       const tx = new Transaction();
       tx.moveCall({
-        target: `${PACKAGE_ID}::${MODULE}::deposit_monster`,
-        arguments: [tx.object(matchId), tx.object(selectedMonster.objectId), tx.object(CLOCK_ID)],
+        target: `${PACKAGE_ID}::${MODULE}::deposit_martian`,
+        arguments: [tx.object(matchId), tx.object(selectedMonster.objectId), tx.object(TREASURY_ID), tx.object(CLOCK_ID)],
       });
 
       const stakeMist = toMist(selectedStake);
@@ -163,7 +163,7 @@ export function MatchRouteView({ matchId, spectatorOnly = false }: MatchRouteVie
         });
       }
 
-      await execute(tx, 'Legend deposited');
+      await execute(tx, 'Martian deposited');
       await walletMonsters.refetch();
       await battleMatch.refetch();
     } finally {
@@ -179,9 +179,9 @@ export function MatchRouteView({ matchId, spectatorOnly = false }: MatchRouteVie
       const tx = new Transaction();
       tx.moveCall({
         target: `${PACKAGE_ID}::${MODULE}::withdraw`,
-        arguments: [tx.object(matchId)],
+        arguments: [tx.object(matchId), tx.object(TREASURY_ID), tx.object(CLOCK_ID)],
       });
-      await execute(tx, 'Legend returned');
+      await execute(tx, 'Martian returned');
       await walletMonsters.refetch();
       await battleMatch.refetch();
     } finally {
@@ -218,7 +218,7 @@ export function MatchRouteView({ matchId, spectatorOnly = false }: MatchRouteVie
   if (!match) {
     return (
       <div className="glass-card p-5 text-sm text-gray-300">
-        Battle not found.
+        Battle not found on Martians mainnet.
       </div>
     );
   }

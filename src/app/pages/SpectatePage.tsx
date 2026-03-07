@@ -7,7 +7,7 @@ export function SpectatePage() {
   const { matchId = '' } = useParams();
 
   return (
-    <PageShell title="Spectate" subtitle="Watch the current ArenaMatch without control access.">
+    <PageShell title="Spectate" subtitle="Watch the current MartianMatch without control access.">
       <MatchRouteView matchId={matchId} spectatorOnly />
     </PageShell>
   );

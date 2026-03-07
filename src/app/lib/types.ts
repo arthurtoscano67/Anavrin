@@ -14,6 +14,10 @@ export type Monster = {
   torn_wings: number;
   created_at: string;
   last_breed: string;
+  current_health?: number;
+  max_health?: number;
+  is_dead?: boolean;
+  death_count?: number;
   parent1?: string | null;
   parent2?: string | null;
   location: "wallet" | "kiosk";
@@ -53,6 +57,10 @@ export type ArenaMonsterSnapshot = {
   broken_horns: number;
   torn_wings: number;
   created_at: string;
+  current_health?: number;
+  max_health?: number;
+  is_dead?: boolean;
+  death_count?: number;
   gearSlots?: MonsterGearSlots;
 };
 
@@ -66,6 +74,8 @@ export type ArenaMatch = {
   player_b: string;
   status: ArenaStatus;
   created_at: string;
+  last_update?: string;
+  mode?: number;
   mon_a?: string | null;
   mon_b?: string | null;
   stake_a: string;

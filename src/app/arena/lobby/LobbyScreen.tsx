@@ -55,7 +55,7 @@ export function LobbyScreen({
     <div className="space-y-4">
       <section className="glass-card space-y-4 p-5 sm:p-6">
         <div className="space-y-2 text-center sm:text-left">
-          <div className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan/80">Anavrin Legends</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan/80">Martians</div>
           <h2 className="text-4xl font-black tracking-tight text-white sm:text-5xl">Battle Arena</h2>
         </div>
 
@@ -132,7 +132,7 @@ export function LobbyScreen({
       <section className="glass-card space-y-4 p-5 sm:p-6">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Your Monsters</div>
-          <div className="mt-2 text-2xl font-black text-white">Pick your legend</div>
+          <div className="mt-2 text-2xl font-black text-white">Pick your Martian</div>
         </div>
         <div className="no-scrollbar flex gap-3 overflow-x-auto pb-2">
           {monsters.map((monster) => {

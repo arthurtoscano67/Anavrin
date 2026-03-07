@@ -6,7 +6,7 @@ import { MonsterImage } from "../components/MonsterImage";
 import { PageShell } from "../components/PageShell";
 import { Spinner } from "../components/Spinner";
 import { StatBar } from "../components/StatBar";
-import { CLOCK_ID, MODULE, MONSTER_TYPE, PACKAGE_ID } from "../lib/constants";
+import { CLOCK_ID, MODULE, MONSTER_TYPE, PACKAGE_ID, TREASURY_ID } from "../lib/constants";
 import { short } from "../lib/format";
 import type { Monster } from "../lib/types";
 import { parseMonster } from "../lib/sui";
@@ -50,7 +50,7 @@ export function BreedPage() {
       const tx = new Transaction();
       tx.moveCall({
         target: `${PACKAGE_ID}::${MODULE}::breed`,
-        arguments: [tx.object(parentA), tx.object(parentB), tx.object(CLOCK_ID)],
+        arguments: [tx.object(parentA), tx.object(parentB), tx.object(TREASURY_ID), tx.object(CLOCK_ID)],
       });
 
       const { block } = await executeAndFetchBlock(tx, "Breeding complete");
@@ -76,10 +76,10 @@ export function BreedPage() {
   return (
     <PageShell
       title="Breed"
-      subtitle="Combine two Adult legends (stage 2+) to mint a child with inherited stats and on-chain lineage."
+      subtitle="Combine two Enlightened Martians (stage 2) to mint a child with inherited stats and on-chain lineage."
     >
       {!account && (
-        <div className="glass-card p-4 text-sm text-gray-300">Connect wallet to breed monsters.</div>
+        <div className="glass-card p-4 text-sm text-gray-300">Connect wallet to breed Martians.</div>
       )}
 
       {account && (
@@ -91,7 +91,7 @@ export function BreedPage() {
               <div className="space-y-2">
                 <label className="text-xs text-gray-400">Parent A</label>
                 <select className="input" value={parentA} onChange={(e) => setParentA(e.target.value)}>
-                  <option value="">Choose Adult monster</option>
+                  <option value="">Choose Enlightened Martian</option>
                   {adults.map((m) => (
                     <option value={m.objectId} key={m.objectId}>
                       {m.name} ({short(m.objectId)})
@@ -103,7 +103,7 @@ export function BreedPage() {
               <div className="space-y-2">
                 <label className="text-xs text-gray-400">Parent B</label>
                 <select className="input" value={parentB} onChange={(e) => setParentB(e.target.value)}>
-                  <option value="">Choose Adult monster</option>
+                  <option value="">Choose Enlightened Martian</option>
                   {adults
                     .filter((m) => m.objectId !== parentA)
                     .map((m) => (
@@ -124,7 +124,7 @@ export function BreedPage() {
 
               {adults.length < 2 && (
                 <p className="text-xs text-gray-400">
-                  You need at least two Adult monsters (stage 2+) in your wallet.
+                  You need at least two Enlightened Martians (stage 2) in your wallet.
                 </p>
               )}
             </div>
@@ -181,7 +181,7 @@ export function BreedPage() {
 
           {child && (
             <div className="glass-card space-y-4 p-4">
-              <h3 className="text-lg font-bold text-cyan">Child Monster Minted</h3>
+              <h3 className="text-lg font-bold text-cyan">Child Martian Minted</h3>
               <div className="grid gap-4 md:grid-cols-[220px_1fr]">
                 <MonsterImage objectId={child.objectId} monster={child} className="aspect-square max-w-[220px]" />
                 <div className="space-y-2 text-sm">

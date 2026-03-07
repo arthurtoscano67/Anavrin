@@ -7,7 +7,7 @@ import { MonsterCard } from "../components/MonsterCard";
 import { PageShell } from "../components/PageShell";
 import { Spinner } from "../components/Spinner";
 import { useArenaMatches } from "../hooks/useArenaMatches";
-import { CLOCK_ID, MODULE, PACKAGE_ID } from "../lib/constants";
+import { CLOCK_ID, MODULE, PACKAGE_ID, TREASURY_ID } from "../lib/constants";
 import { toSui } from "../lib/format";
 import { useAnavrinData } from "../hooks/useAnavrinData";
 import { useTxExecutor } from "../hooks/useTxExecutor";
@@ -46,10 +46,10 @@ export function MyLegendsPage() {
     try {
       const tx = new Transaction();
       tx.moveCall({
-        target: `${PACKAGE_ID}::${MODULE}::heartbeat`,
-        arguments: [tx.object(monsterId), tx.object(CLOCK_ID)],
+        target: `${PACKAGE_ID}::${MODULE}::sync_stage`,
+        arguments: [tx.object(monsterId), tx.object(TREASURY_ID), tx.object(CLOCK_ID)],
       });
-      await execute(tx, "Heartbeat synced");
+      await execute(tx, "Stage synced");
       walletMonsters.refetch();
     } finally {
       setPendingMonsterId(null);
@@ -63,7 +63,7 @@ export function MyLegendsPage() {
       const tx = new Transaction();
       tx.moveCall({
         target: `${PACKAGE_ID}::${MODULE}::breed`,
-        arguments: [tx.object(breedTarget), tx.object(breedPartner), tx.object(CLOCK_ID)],
+        arguments: [tx.object(breedTarget), tx.object(breedPartner), tx.object(TREASURY_ID), tx.object(CLOCK_ID)],
       });
       await execute(tx, "Breed transaction sent");
       setBreedTarget(null);
@@ -91,7 +91,7 @@ export function MyLegendsPage() {
           tx.pure.u64(BigInt(Math.floor(Number(listPrice) * 1_000_000_000))),
         ],
       });
-      await execute(tx, "Monster listed");
+      await execute(tx, "Martian listed");
       setListTarget(null);
       walletMonsters.refetch();
       kioskMonsters.refetch();
@@ -102,8 +102,8 @@ export function MyLegendsPage() {
 
   return (
     <PageShell
-      title="My Legends"
-      subtitle="Wallet + kiosk inventory, heartbeat sync, breeding, and listing flows."
+      title="My Martians"
+      subtitle="Wallet + kiosk inventory, stage sync, breeding, and listing flows."
     >
       {!account && <div className="glass-card p-4 text-sm text-gray-300">Connect wallet to see your monsters.</div>}
 
@@ -112,13 +112,13 @@ export function MyLegendsPage() {
           <div className="text-sm text-gray-300">Owned kiosk caps: <strong>{kioskCaps.data?.length ?? 0}</strong></div>
           <button className="btn-secondary" onClick={onCreateKiosk}>Create Kiosk</button>
           {kioskMonsters.data && kioskMonsters.data.length > 0 && (
-            <div className="text-sm text-cyan">Kiosk monsters listed/stored: {kioskMonsters.data.length}</div>
+            <div className="text-sm text-cyan">Kiosk Martians listed/stored: {kioskMonsters.data.length}</div>
           )}
         </div>
       )}
 
       <div className="space-y-3">
-        <h2 className="text-xl font-bold">Wallet Monsters</h2>
+        <h2 className="text-xl font-bold">Wallet Martians</h2>
         {walletMonsters.isLoading ? (
           <LoadingGrid />
         ) : walletMonsters.data && walletMonsters.data.length > 0 ? (
@@ -128,7 +128,7 @@ export function MyLegendsPage() {
                 key={monster.objectId}
                 monster={monster}
                 arenaDisabled={depositedMonsterIds.has(monster.objectId)}
-                arenaLabel={depositedMonsterIds.has(monster.objectId) ? "Deposited" : "Send To Arena"}
+                arenaLabel={depositedMonsterIds.has(monster.objectId) ? "Deposited" : "Send To Battle"}
                 actions={
                   <div className="grid gap-2">
                     <button
@@ -139,7 +139,7 @@ export function MyLegendsPage() {
                       {pendingMonsterId === monster.objectId ? (
                         <span className="inline-flex items-center gap-2"><Spinner /> Syncing</span>
                       ) : (
-                        "Heartbeat"
+                        "Sync Stage"
                       )}
                     </button>
 
@@ -158,12 +158,12 @@ export function MyLegendsPage() {
             ))}
           </div>
         ) : (
-          <div className="glass-card p-4 text-sm text-gray-300">No wallet monsters yet.</div>
+          <div className="glass-card p-4 text-sm text-gray-300">No wallet Martians yet.</div>
         )}
       </div>
 
       <div className="space-y-3">
-        <h2 className="text-xl font-bold">Kiosk Monsters</h2>
+        <h2 className="text-xl font-bold">Kiosk Martians</h2>
         {kioskMonsters.isLoading ? (
           <LoadingGrid count={4} />
         ) : kioskMonsters.data && kioskMonsters.data.length > 0 ? (
@@ -173,16 +173,16 @@ export function MyLegendsPage() {
             ))}
           </div>
         ) : (
-          <div className="glass-card p-4 text-sm text-gray-300">No monsters currently in your kiosks.</div>
+          <div className="glass-card p-4 text-sm text-gray-300">No Martians currently in your kiosks.</div>
         )}
       </div>
 
       {breedTarget && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
           <div className="glass-card w-full max-w-md space-y-4 p-5">
-            <h3 className="text-lg font-bold">Breed Monster</h3>
+            <h3 className="text-lg font-bold">Breed Martian</h3>
             <select className="input" value={breedPartner} onChange={(e) => setBreedPartner(e.target.value)}>
-              <option value="">Select second Adult monster</option>
+              <option value="">Select second Enlightened Martian</option>
               {adults
                 .filter((m) => m.objectId !== breedTarget)
                 .map((m) => (
@@ -200,7 +200,7 @@ export function MyLegendsPage() {
       {listTarget && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
           <div className="glass-card w-full max-w-md space-y-4 p-5">
-            <h3 className="text-lg font-bold">List Monster</h3>
+            <h3 className="text-lg font-bold">List Martian</h3>
             <select className="input" value={listCap} onChange={(e) => setListCap(e.target.value)}>
               <option value="">Select kiosk cap</option>
               {(kioskCaps.data ?? []).map((cap) => (

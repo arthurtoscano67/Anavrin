@@ -110,6 +110,10 @@ function parseEmbeddedArenaMonster(value: unknown): ArenaMonsterSnapshot | null 
     broken_horns: Number(fields.broken_horns ?? 0),
     torn_wings: Number(fields.torn_wings ?? 0),
     created_at: String(fields.created_at ?? "0"),
+    current_health: Number(fields.current_health ?? 0),
+    max_health: Number(fields.max_health ?? 0),
+    is_dead: Boolean(fields.is_dead),
+    death_count: Number(fields.death_count ?? 0),
     gearSlots: parseGearSlots(fields),
   };
 }
@@ -144,6 +148,10 @@ export function parseMonster(data: SuiObjectData, location: "wallet" | "kiosk", 
     torn_wings: Number(f.torn_wings ?? 0),
     created_at: String(f.created_at ?? "0"),
     last_breed: String(f.last_breed ?? "0"),
+    current_health: Number(f.current_health ?? 0),
+    max_health: Number(f.max_health ?? 0),
+    is_dead: Boolean(f.is_dead),
+    death_count: Number(f.death_count ?? 0),
     parent1: parseOptionId(f.parent1),
     parent2: parseOptionId(f.parent2),
     location,
@@ -277,7 +285,9 @@ export async function queryModuleEvents(
 
 export async function fetchLatestMintPreviewId(client: SuiClient): Promise<string | null> {
   const events = await queryAllEvents(client, `${PACKAGE_ID}::${MODULE}::Minted`, 1, 20);
-  const ids = events.map((e) => String(asRecord(e.parsedJson).monster_id ?? "")).filter(Boolean);
+  const ids = events
+    .map((e) => String(asRecord(e.parsedJson).martian_id ?? asRecord(e.parsedJson).monster_id ?? ""))
+    .filter(Boolean);
   if (ids.length === 0) return null;
   return ids[Math.floor(Math.random() * ids.length)];
 }
@@ -295,12 +305,14 @@ export async function fetchArenaMatch(client: SuiClient, matchId: string): Promi
     player_b: String(f.player_b ?? ""),
     status: Number(f.status ?? 0) as 0 | 1 | 2 | 3,
     created_at: String(f.created_at ?? "0"),
-    mon_a: parseOptionMonsterId(f.mon_a),
-    mon_b: parseOptionMonsterId(f.mon_b),
+    last_update: String(f.last_update ?? "0"),
+    mode: Number(f.mode ?? 0),
+    mon_a: parseOptionMonsterId(f.martian_a ?? f.mon_a),
+    mon_b: parseOptionMonsterId(f.martian_b ?? f.mon_b),
     stake_a: parseBalanceValue(f.stake_a),
     stake_b: parseBalanceValue(f.stake_b),
-    monster_a_data: parseEmbeddedArenaMonster(f.mon_a),
-    monster_b_data: parseEmbeddedArenaMonster(f.mon_b),
+    monster_a_data: parseEmbeddedArenaMonster(f.martian_a ?? f.mon_a),
+    monster_b_data: parseEmbeddedArenaMonster(f.martian_b ?? f.mon_b),
   };
 }
 
@@ -314,17 +326,44 @@ export function extractCreatedArenaMatchId(block: {
 }
 
 export async function fetchAllArenaMatches(client: SuiClient): Promise<ArenaMatch[]> {
-  const events = await queryAllEvents(client, `${PACKAGE_ID}::${MODULE}::MatchCreated`);
-  const ids = [...new Set(
-    events
-      .map((event) => String(asRecord(event.parsedJson).match_id ?? ""))
-      .filter(Boolean)
-  )];
+  let cursor: string | null | undefined = null;
+  const ids = new Set<string>();
 
-  if (ids.length === 0) return [];
+  for (let page = 0; page < 12; page += 1) {
+    const txs = await client.queryTransactionBlocks({
+      filter: {
+        MoveFunction: {
+          package: PACKAGE_ID,
+          module: MODULE,
+          function: "create_match",
+        },
+      },
+      cursor,
+      limit: 50,
+      order: "descending",
+      options: { showObjectChanges: true },
+    });
+
+    for (const tx of txs.data) {
+      const created = tx.objectChanges?.find((change) => {
+        const candidate = change as { type?: string; objectType?: string; objectId?: string };
+        return (
+          candidate.type === "created" &&
+          candidate.objectType === ARENA_MATCH_TYPE &&
+          typeof candidate.objectId === "string"
+        );
+      }) as { objectId?: string } | undefined;
+      if (typeof created?.objectId === "string") ids.add(created.objectId);
+    }
+
+    if (!txs.hasNextPage || !txs.nextCursor) break;
+    cursor = txs.nextCursor;
+  }
+
+  if (ids.size === 0) return [];
 
   const matches = await Promise.all(
-    ids.map(async (id) => {
+    [...ids].map(async (id) => {
       try {
         return await fetchArenaMatch(client, id);
       } catch {
@@ -344,8 +383,9 @@ export async function fetchRecentMatches(client: SuiClient): Promise<ArenaMatch[
 }
 
 export async function fetchActivePlayers(client: SuiClient): Promise<ActivePlayer[]> {
+  if (ACTIVE_PLAYER_EVENT_TYPES.length === 0) return [];
   const activity: Record<string, ActivePlayer> = {};
-  for (const eventType of ACTIVE_PLAYER_EVENT_TYPES) {
+  for (const eventType of ACTIVE_PLAYER_EVENT_TYPES as readonly string[]) {
     const events = await queryAllEvents(client, eventType, 2, 50);
     for (const event of events) {
       const parsed = asRecord(event.parsedJson);
@@ -357,7 +397,7 @@ export async function fetchActivePlayers(client: SuiClient): Promise<ActivePlaye
         activity[address] = {
           address,
           lastActivityMs: ts,
-          source: eventType.endsWith("MatchCreated") ? "match_created" : "deposit",
+          source: eventType.includes("MatchCreated") ? "match_created" : "deposit",
         };
       }
     }

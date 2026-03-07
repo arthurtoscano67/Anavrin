@@ -11,12 +11,12 @@ export function LeaderboardPage() {
   return (
     <PageShell
       title="Leaderboard"
-      subtitle="Top 20 monsters ranked by wins first, then XP from on-chain BattleOutcome events."
+      subtitle="Top Martians ranked by wins and XP from indexed battle history."
     >
       {leaderboard.isLoading ? (
         <LoadingGrid count={8} />
       ) : (leaderboard.data ?? []).length === 0 ? (
-        <div className="glass-card p-4 text-sm text-gray-300">No battle outcomes recorded yet.</div>
+        <div className="glass-card p-4 text-sm text-gray-300">No indexed Martian battles recorded yet.</div>
       ) : (
         <div className="space-y-3">
           {(leaderboard.data ?? []).map((monster, idx) => (

@@ -103,7 +103,7 @@ export function buildBattlePreview(match: ArenaMatch | null, resolution?: MatchR
   const frames: BattleFrame[] = [
     {
       id: 'stare-down',
-      label: 'Legends lock eyes.',
+      label: 'Martians lock eyes.',
       actor: 'none',
       leftHp: 100,
       rightHp: 100,
@@ -196,7 +196,7 @@ export function buildRoomModel(input: {
     }
   } else if (match && match.status === 3) {
     heroTitle = 'Battle cancelled.';
-    heroHint = 'The room was cancelled. Legends should be back with their trainers.';
+    heroHint = 'The room was cancelled. Martians should be back with their trainers.';
     nextActionLabel = 'Back to lobby';
     opponentStatusLabel = 'Left room';
     yourTaskLabel = 'Return to lobby';
@@ -209,39 +209,39 @@ export function buildRoomModel(input: {
     nextActionLabel = 'Watch result';
     opponentStatusLabel = 'Fight ended';
     yourTaskLabel = 'See result';
-    yourTaskDetail = 'The fight is done and the legends are back in their wallets.';
+    yourTaskDetail = 'The fight is done and the Martians are back in their wallets.';
     opponentTaskLabel = 'See result';
     opponentTaskDetail = 'The other trainer is also done with this room.';
   } else if (match) {
     if (!playerDeposited) {
-      heroTitle = 'Send your legend.';
+      heroTitle = 'Send your Martian.';
       heroHint = 'Your side is empty. Deposit your NFT and set your wager.';
       nextActionLabel = 'Deposit';
-      opponentStatusLabel = opponentDeposited ? 'Legend loaded' : opponent?.present ? 'Choosing legend' : 'Not in room';
-      yourTaskLabel = 'Deposit legend';
-      yourTaskDetail = 'Pick your legend and optional wager, then deposit once.';
-      opponentTaskLabel = opponentDeposited ? 'Waiting on you' : opponent?.present ? 'Pick a legend' : 'Return to room';
+      opponentStatusLabel = opponentDeposited ? 'Martian loaded' : opponent?.present ? 'Choosing Martian' : 'Not in room';
+      yourTaskLabel = 'Deposit Martian';
+      yourTaskDetail = 'Pick your Martian and optional wager, then deposit once.';
+      opponentTaskLabel = opponentDeposited ? 'Waiting on you' : opponent?.present ? 'Pick a Martian' : 'Return to room';
       opponentTaskDetail = opponentDeposited
         ? 'They are already deposited. Your deposit is the next step.'
         : opponent?.present
-          ? 'They still need to choose and deposit their legend.'
+          ? 'They still need to choose and deposit their Martian.'
           : 'They need to reopen the room to continue.';
     } else if (!opponentDeposited) {
       heroTitle = 'Waiting for the other side.';
-      heroHint = 'Your legend is loaded. They still need to deposit theirs. You can withdraw safely until they do.';
+      heroHint = 'Your Martian is loaded. They still need to deposit theirs. You can withdraw safely until they do.';
       nextActionLabel = 'Wait';
       opponentStatusLabel = opponent?.present ? 'Needs deposit' : 'Left room';
       yourTaskLabel = canWithdraw ? 'Wait or withdraw' : 'Wait for deposit';
       yourTaskDetail = canWithdraw
-        ? 'Your legend is safe in the pool. You can still withdraw before they deposit.'
+        ? 'Your Martian is safe in the pool. You can still withdraw before they deposit.'
         : 'Stay in the room until the other trainer deposits.';
-      opponentTaskLabel = opponent?.present ? 'Deposit legend' : 'Return to room';
+      opponentTaskLabel = opponent?.present ? 'Deposit Martian' : 'Return to room';
       opponentTaskDetail = opponent?.present
-        ? 'Their next step is depositing a legend into the pool.'
+        ? 'Their next step is depositing a Martian into the pool.'
         : 'They need to come back to the room before the battle can continue.';
     } else {
       heroTitle = 'Battle now.';
-      heroHint = 'Both legends are deposited. Anyone can start the battle now.';
+      heroHint = 'Both Martians are deposited. Anyone can start the battle now.';
       nextActionLabel = 'Battle';
       opponentStatusLabel = opponent?.present ? 'Deposited' : 'Locked in';
       yourTaskLabel = 'Start battle';

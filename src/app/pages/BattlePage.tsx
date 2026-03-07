@@ -7,7 +7,7 @@ export function BattlePage() {
   const { matchId = '' } = useParams();
 
   return (
-    <PageShell title="Battle" subtitle="This page only loads one ArenaMatch and restores it from the chain.">
+    <PageShell title="Battle" subtitle="This page loads one MartianMatch and restores it from chain.">
       <MatchRouteView matchId={matchId} />
     </PageShell>
   );

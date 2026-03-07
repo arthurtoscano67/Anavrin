@@ -97,7 +97,7 @@ export function AdminPage() {
         target: `${PACKAGE_ID}::${MODULE}::withdraw_fees`,
         arguments: [tx.object(TREASURY_ID), tx.object(capId), tx.pure.address(withdrawTo)],
       });
-      await execute(tx, "Treasury fees withdrawn");
+      await execute(tx, "Game fees withdrawn");
       await treasury.refetch();
     } finally {
       setPending(null);
@@ -131,7 +131,7 @@ export function AdminPage() {
 
   if (adminCapId.isLoading) {
     return (
-      <PageShell title="Admin Dashboard" subtitle="Checking AdminCap ownership and loading live battle state.">
+      <PageShell title="Admin Dashboard" subtitle="Checking AdminCap ownership and loading live Martian match state.">
         <div className="glass-card flex items-center gap-3 p-4 text-sm text-gray-300">
           <Spinner />
           Checking AdminCap ownership...
@@ -147,7 +147,7 @@ export function AdminPage() {
   return (
     <PageShell
       title="Admin Dashboard"
-      subtitle="Live mint controls plus emergency cancellation for stuck arena battles."
+      subtitle="Live mint controls plus emergency cancellation for stuck Martian battles."
     >
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="glass-card space-y-4 p-4 lg:col-span-2">
@@ -161,7 +161,7 @@ export function AdminPage() {
           {arenaMatches.isLoading ? (
             <div className="flex items-center gap-3 rounded-2xl border border-borderSoft bg-black/20 p-4 text-sm text-gray-300">
               <Spinner />
-              Loading ArenaMatch objects from chain...
+              Loading MartianMatch objects from chain...
             </div>
           ) : activeMatches.length === 0 ? (
             <div className="rounded-2xl border border-borderSoft bg-black/20 p-4 text-sm text-gray-300">
@@ -216,7 +216,7 @@ export function AdminPage() {
         </div>
 
         <div className="glass-card space-y-4 p-4">
-          <h2 className="text-lg font-bold">Mint + Treasury</h2>
+          <h2 className="text-lg font-bold">Mint + Game Config</h2>
 
           <div className="grid gap-3">
             <div className="rounded-2xl border border-borderSoft bg-black/20 p-3">
@@ -226,7 +226,7 @@ export function AdminPage() {
               </div>
             </div>
             <div className="rounded-2xl border border-borderSoft bg-black/20 p-3">
-              <div className="text-xs uppercase tracking-[0.22em] text-gray-400">Treasury Fees</div>
+              <div className="text-xs uppercase tracking-[0.22em] text-gray-400">Game Fees</div>
               <div className="mt-2 text-lg font-bold text-cyan">{toSui(treasury.data?.fees)} SUI</div>
             </div>
           </div>
@@ -260,7 +260,7 @@ export function AdminPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold">Cancel Battle</h2>
-            <p className="text-sm text-gray-400">All ArenaMatch objects from chain. WAITING and LOCKED matches are highlighted for admin review.</p>
+            <p className="text-sm text-gray-400">All MartianMatch objects from chain. WAITING and LOCKED matches are highlighted for admin review.</p>
           </div>
           <button className="btn-ghost text-xs" onClick={() => arenaMatches.refetch()} disabled={arenaMatches.isFetching}>
             {arenaMatches.isFetching ? "Refreshing..." : "Refresh Matches"}

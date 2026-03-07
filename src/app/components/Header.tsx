@@ -11,11 +11,11 @@ export function Header() {
     <header className="safe-top sticky top-0 z-40 border-b border-borderSoft bg-background/90 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4">
         <div className="flex items-start justify-between gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-xl border border-purple/40 bg-purple/20 text-xl">💗</div>
+          <div className="grid h-11 w-11 place-items-center rounded-xl border border-purple/40 bg-purple/20 text-xl">👽</div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-lg font-extrabold tracking-tight">Anavrin Legends</div>
+            <div className="truncate text-lg font-extrabold tracking-tight">Martians</div>
             <div className="truncate text-xs text-gray-400">
-              {account ? `Connected: ${short(account.address)}` : 'Sui Mainnet • Living NFT Game'}
+              {account ? `Connected: ${short(account.address)}` : 'Sui Mainnet • Martian battle game'}
             </div>
           </div>
           <div className="shrink-0">

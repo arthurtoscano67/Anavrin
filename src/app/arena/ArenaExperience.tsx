@@ -10,7 +10,7 @@ import { useArena } from '../hooks/useArena';
 import { useAnavrinData } from '../hooks/useAnavrinData';
 import { useArenaMatches } from '../hooks/useArenaMatches';
 import { useTxExecutor } from '../hooks/useTxExecutor';
-import { ARENA_MATCH_TYPE, CLOCK_ID, MODULE, PACKAGE_ID, TREASURY_ID } from '../lib/constants';
+import { ARENA_MATCH_TYPE, CLOCK_ID, MODULE, NORMAL_BATTLE_MODE, PACKAGE_ID, TREASURY_ID } from '../lib/constants';
 import { short, toMist } from '../lib/format';
 import { fetchArenaMatch, fetchMatchResolution } from '../lib/sui';
 import type { ArenaMatch, MatchResolution, Monster } from '../lib/types';
@@ -78,7 +78,7 @@ export function ArenaExperience() {
   const lobby = useLobbyPresence({
     enabled: Boolean(account?.address),
     address: account?.address,
-    monsterName: selectedMonster?.name ?? 'Legend',
+    monsterName: selectedMonster?.name ?? 'Martian',
     level: (selectedMonster?.stage ?? 0) + 1,
   });
 
@@ -376,7 +376,7 @@ export function ArenaExperience() {
       const tx = new Transaction();
       tx.moveCall({
         target: `${PACKAGE_ID}::${MODULE}::create_match`,
-        arguments: [tx.pure.address(opponentAddress), tx.object(CLOCK_ID)],
+        arguments: [tx.object(TREASURY_ID), tx.object(CLOCK_ID), tx.pure.address(opponentAddress), tx.pure.u8(NORMAL_BATTLE_MODE)],
       });
 
       const { block } = await executeAndFetchBlock(tx, 'Battle room created');
@@ -404,7 +404,7 @@ export function ArenaExperience() {
 
   const handleInvite = useCallback((address: string) => {
     if (!selectedMonster) {
-      toast.error('Pick your legend first');
+      toast.error('Pick your Martian first');
       return;
     }
     const roomId = generateBattleRoomId(account!.address, address);
@@ -433,7 +433,7 @@ export function ArenaExperience() {
 
   const handleDeposit = useCallback(async () => {
     if (!account?.address || !arena.currentMatchId || !selectedMonster) {
-      toast.error('Pick a room and a legend first');
+      toast.error('Pick a room and a Martian first');
       return;
     }
 
@@ -441,8 +441,8 @@ export function ArenaExperience() {
     try {
       const tx = new Transaction();
       tx.moveCall({
-        target: `${PACKAGE_ID}::${MODULE}::deposit_monster`,
-        arguments: [tx.object(arena.currentMatchId), tx.object(selectedMonster.objectId), tx.object(CLOCK_ID)],
+        target: `${PACKAGE_ID}::${MODULE}::deposit_martian`,
+        arguments: [tx.object(arena.currentMatchId), tx.object(selectedMonster.objectId), tx.object(TREASURY_ID), tx.object(CLOCK_ID)],
       });
 
       const stakeMist = toMist(selectedStake);
@@ -454,7 +454,7 @@ export function ArenaExperience() {
         });
       }
 
-      await execute(tx, 'Legend deposited');
+      await execute(tx, 'Martian deposited');
       await walletMonsters.refetch();
       await loadMatch(arena.currentMatchId, 'room');
     } finally {
@@ -469,9 +469,9 @@ export function ArenaExperience() {
       const tx = new Transaction();
       tx.moveCall({
         target: `${PACKAGE_ID}::${MODULE}::withdraw`,
-        arguments: [tx.object(arena.currentMatchId)],
+        arguments: [tx.object(arena.currentMatchId), tx.object(TREASURY_ID), tx.object(CLOCK_ID)],
       });
-      await execute(tx, 'Legend returned');
+      await execute(tx, 'Martian returned');
       await walletMonsters.refetch();
       await loadMatch(arena.currentMatchId, 'room');
     } finally {
@@ -512,7 +512,7 @@ export function ArenaExperience() {
   }, []);
 
   const handleEmote = useCallback(() => {
-    toast.message('Your legend roars!');
+    toast.message('Your Martian roars!');
   }, []);
 
   const handleBackLobby = useCallback(() => {
@@ -544,10 +544,10 @@ export function ArenaExperience() {
       <PageShell title="Arena" subtitle="Connect your Sui wallet to invite, deposit, and battle.">
         <div className="space-y-4">
           <section className="glass-card space-y-4 p-5 sm:p-6">
-            <div className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan/80">Anavrin Legends</div>
+            <div className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan/80">Martians</div>
             <h2 className="text-4xl font-black tracking-tight text-white sm:text-5xl">Battle Arena</h2>
             <p className="max-w-2xl text-sm leading-6 text-gray-300">
-              Connect your wallet to see trainers online, pick your legend, and jump into battle rooms.
+              Connect your wallet to see fighters online, pick your Martian, and jump into battle rooms.
             </p>
           </section>
 
@@ -561,7 +561,7 @@ export function ArenaExperience() {
             </section>
             <section className="glass-card space-y-3 p-5">
               <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">2. Room</div>
-              <div className="text-2xl font-black text-white">Open room and deposit legends</div>
+              <div className="text-2xl font-black text-white">Open room and deposit Martians</div>
               <div className="rounded-[22px] border border-borderSoft bg-black/20 p-4 text-sm text-gray-400">
                 Open the on-chain match, deposit NFTs, and keep withdraw open until both sides are in.
               </div>
