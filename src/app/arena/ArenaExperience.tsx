@@ -92,6 +92,22 @@ export function ArenaExperience() {
   const roomSetStake = room.setStake;
   const roomSetReady = room.setReady;
 
+  const resetToLobby = useCallback(() => {
+    setActiveMatch(null);
+    setResolution(null);
+    setPending(null);
+    arena.setCurrentMatchId('');
+    arena.persistRoomId(null);
+    arena.setScreen('lobby');
+    arenaMatches.persistMatchId(null);
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('match');
+      next.delete('room');
+      return next;
+    });
+  }, [arena, arenaMatches.persistMatchId, setParams]);
+
   useEffect(() => {
     if (!selectedMonster || !roomIsConnected) return;
     roomSetSelection({
@@ -141,16 +157,22 @@ export function ArenaExperience() {
     }
 
     const urlMatch = params.get('match');
+    if (!urlMatch && !urlRoom) {
+      setActiveMatch(null);
+      setResolution(null);
+      arena.setCurrentMatchId('');
+      arena.persistRoomId(null);
+      arenaMatches.persistMatchId(null);
+      arena.setScreen('lobby');
+      return;
+    }
+
     if (urlMatch && activeMatch?.objectId !== urlMatch) {
       arena.setCurrentMatchId(urlMatch);
       void loadMatch(urlMatch, 'battle');
       return;
     }
-
-    if (!urlMatch && !arena.currentMatchId && arenaMatches.restoredOwnedMatch) {
-      void loadMatch(arenaMatches.restoredOwnedMatch.objectId, 'room');
-    }
-  }, [activeMatch?.objectId, arena, arenaMatches.restoredOwnedMatch, loadMatch, params]);
+  }, [activeMatch?.objectId, arena, arenaMatches.persistMatchId, loadMatch, params]);
 
   useEffect(() => {
     if (!arena.currentMatchId || activeMatch?.objectId === arena.currentMatchId) return;
@@ -397,8 +419,8 @@ export function ArenaExperience() {
   }, []);
 
   const handleBackLobby = useCallback(() => {
-    arena.setScreen('lobby');
-  }, [arena]);
+    resetToLobby();
+  }, [resetToLobby]);
 
   const handleOpenBattle = useCallback(() => {
     arena.setScreen('battle');
