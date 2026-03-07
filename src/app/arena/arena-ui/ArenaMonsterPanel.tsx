@@ -1,6 +1,6 @@
 import { StageBadge } from '../../components/StageBadge';
 import { StatBar } from '../../components/StatBar';
-import { MonsterImage } from '../../components/MonsterImage';
+import { MonsterViewport3D } from '../../components/MonsterViewport3D';
 import { powerPreview, short } from '../../lib/format';
 import type { ArenaMonsterSnapshot, Monster } from '../../lib/types';
 
@@ -62,10 +62,12 @@ export function ArenaMonsterPanel({
           <div className="arena-creature-frame">
             <div className="arena-creature-glow" />
             <div className={`arena-idle-${side} relative z-10 mx-auto h-48 w-48 rounded-full border border-white/10 bg-white/5`} style={side === 'right' ? { transform: 'scaleX(-1)' } : undefined}>
-              <MonsterImage
+              <MonsterViewport3D
                 objectId={monster!.objectId!}
                 monster={monster as Monster}
                 className="h-full w-full"
+                mirrored={side === 'right'}
+                priority="arena"
               />
             </div>
             <div className="arena-blink" />

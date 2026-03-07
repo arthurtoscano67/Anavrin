@@ -19,6 +19,7 @@ import type {
   Listing,
   MatchResolution,
   Monster,
+  MonsterGearSlots,
   TreasuryConfig,
 } from "./types";
 
@@ -71,6 +72,22 @@ function extractEmbeddedMonsterFields(value: unknown): Record<string, unknown> |
   return parseObjectIdField(nestedFields.id) ? nestedFields : null;
 }
 
+function parseGearSlots(fields: Record<string, unknown>): MonsterGearSlots | undefined {
+  const gearSource = asRecord(fields.gear_slots ?? fields.gear ?? {});
+  const slots = ["hat", "shirt", "pants", "shoes", "armor", "suit"] as const;
+  const parsed: MonsterGearSlots = {};
+
+  for (const slot of slots) {
+    const direct = fields[slot];
+    const nested = gearSource[slot];
+    const value = typeof direct === "string" ? direct : typeof nested === "string" ? nested : null;
+    if (!value || value === "None") continue;
+    parsed[slot] = value;
+  }
+
+  return Object.keys(parsed).length > 0 ? parsed : undefined;
+}
+
 function parseEmbeddedArenaMonster(value: unknown): ArenaMonsterSnapshot | null {
   const fields = extractEmbeddedMonsterFields(value);
   if (!fields) return null;
@@ -93,6 +110,7 @@ function parseEmbeddedArenaMonster(value: unknown): ArenaMonsterSnapshot | null 
     broken_horns: Number(fields.broken_horns ?? 0),
     torn_wings: Number(fields.torn_wings ?? 0),
     created_at: String(fields.created_at ?? "0"),
+    gearSlots: parseGearSlots(fields),
   };
 }
 
@@ -131,6 +149,7 @@ export function parseMonster(data: SuiObjectData, location: "wallet" | "kiosk", 
     location,
     kioskId,
     priceMist,
+    gearSlots: parseGearSlots(f),
   };
 }
 

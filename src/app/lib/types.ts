@@ -19,6 +19,7 @@ export type Monster = {
   location: "wallet" | "kiosk";
   kioskId?: string;
   priceMist?: string;
+  gearSlots?: MonsterGearSlots;
 };
 
 export type TreasuryConfig = {
@@ -52,7 +53,12 @@ export type ArenaMonsterSnapshot = {
   broken_horns: number;
   torn_wings: number;
   created_at: string;
+  gearSlots?: MonsterGearSlots;
 };
+
+export type MonsterGearSlot = "hat" | "shirt" | "pants" | "shoes" | "armor" | "suit";
+
+export type MonsterGearSlots = Partial<Record<MonsterGearSlot, string | null>>;
 
 export type ArenaMatch = {
   objectId: string;
