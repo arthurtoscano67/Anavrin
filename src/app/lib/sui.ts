@@ -292,6 +292,45 @@ export async function fetchLatestMintPreviewId(client: SuiClient): Promise<strin
   return ids[Math.floor(Math.random() * ids.length)];
 }
 
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    out.push(items.slice(i, i + size));
+  }
+  return out;
+}
+
+export async function fetchMintedMonsters(client: SuiClient): Promise<Monster[]> {
+  const events = await queryAllEvents(client, `${PACKAGE_ID}::${MODULE}::Minted`, 20, 50);
+  const ids = Array.from(
+    new Set(
+      events
+        .map((event) => String(asRecord(event.parsedJson).martian_id ?? asRecord(event.parsedJson).monster_id ?? ""))
+        .filter(Boolean)
+    )
+  );
+
+  if (ids.length === 0) return [];
+
+  const chunks = chunk(ids, 50);
+  const objects = await Promise.all(
+    chunks.map((part) =>
+      client.multiGetObjects({
+        ids: part,
+        options: { showContent: true, showDisplay: true, showType: true },
+      })
+    )
+  );
+
+  return objects
+    .flatMap((response) => response)
+    .map((obj) => obj.data)
+    .filter((obj): obj is SuiObjectData => Boolean(obj))
+    .map((obj) => parseMonster(obj, "wallet"))
+    .filter((monster): monster is Monster => Boolean(monster))
+    .sort((a, b) => Number(b.created_at) - Number(a.created_at));
+}
+
 export async function fetchArenaMatch(client: SuiClient, matchId: string): Promise<ArenaMatch | null> {
   const obj = await client.getObject({ id: matchId, options: { showContent: true } });
   const c = obj.data?.content;

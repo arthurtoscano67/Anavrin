@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
+import { Link } from "react-router-dom";
 
 import { LoadingGrid } from "../components/LoadingGrid";
-import { MonsterCard } from "../components/MonsterCard";
+import { MartianGifCard } from "../components/MartianGifCard";
 import { PageShell } from "../components/PageShell";
 import { Spinner } from "../components/Spinner";
 import { useArenaMatches } from "../hooks/useArenaMatches";
@@ -124,11 +125,9 @@ export function MyLegendsPage() {
         ) : walletMonsters.data && walletMonsters.data.length > 0 ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {walletMonsters.data.map((monster) => (
-              <MonsterCard
+              <MartianGifCard
                 key={monster.objectId}
                 monster={monster}
-                arenaDisabled={depositedMonsterIds.has(monster.objectId)}
-                arenaLabel={depositedMonsterIds.has(monster.objectId) ? "Deposited" : "Send To Battle"}
                 actions={
                   <div className="grid gap-2">
                     <button
@@ -152,6 +151,19 @@ export function MyLegendsPage() {
                     <button className="btn-ghost w-full" onClick={() => setListTarget(monster.objectId)}>
                       List For Sale
                     </button>
+
+                    {depositedMonsterIds.has(monster.objectId) ? (
+                      <button className="btn-ghost w-full text-center text-xs" disabled>
+                        Deposited
+                      </button>
+                    ) : (
+                      <Link
+                        to={`/lobby?monster=${monster.objectId}`}
+                        className="btn-ghost w-full text-center text-xs"
+                      >
+                        Send To Battle
+                      </Link>
+                    )}
                   </div>
                 }
               />
@@ -169,7 +181,7 @@ export function MyLegendsPage() {
         ) : kioskMonsters.data && kioskMonsters.data.length > 0 ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {kioskMonsters.data.map((monster) => (
-              <MonsterCard key={`${monster.kioskId}-${monster.objectId}`} monster={monster} />
+              <MartianGifCard key={`${monster.kioskId}-${monster.objectId}`} monster={monster} />
             ))}
           </div>
         ) : (

@@ -4,6 +4,7 @@ import { Header } from "./components/Header";
 import { AdminPage } from "./pages/AdminPage";
 import { BattlePage } from "./pages/BattlePage";
 import { BreedPage } from "./pages/BreedPage";
+import { GalleryPage } from "./pages/GalleryPage";
 import { LeaderboardPage } from "./pages/LeaderboardPage";
 import { LobbyPage } from "./pages/LobbyPage";
 import { MarketplacePage } from "./pages/MarketplacePage";
@@ -21,6 +22,7 @@ export function App() {
           <Route path="/" element={<MintPage />} />
           <Route path="/legends" element={<Navigate to="/my-monsters" replace />} />
           <Route path="/my-monsters" element={<MyLegendsPage />} />
+          <Route path="/gallery" element={<GalleryPage />} />
           <Route path="/arena" element={<Navigate to="/lobby" replace />} />
           <Route path="/lobby" element={<LobbyPage />} />
           <Route path="/queue" element={<QueuePage />} />
