@@ -1,8 +1,9 @@
+import { useMemo, useState } from 'react';
 import { StageBadge } from '../../components/StageBadge';
 import { MonsterImage } from '../../components/MonsterImage';
 import { short, toSui } from '../../lib/format';
 import type { ArenaMatch, MatchResolution, Monster } from '../../lib/types';
-import type { LobbyConnectionState, RoomNotice, RoomParticipant } from '../network/types';
+import type { LobbyConnectionState, RoomChatMessage, RoomNotice, RoomParticipant } from '../network/types';
 import type { RoomModel } from '../battle-engine/battleEngine';
 import { ArenaMonsterPanel } from '../arena-ui/ArenaMonsterPanel';
 
@@ -37,6 +38,7 @@ export function BattleRoomScreen({
   resolution,
   roomParticipants,
   roomNotices,
+  roomMessages,
   roomModel,
   selectedMonsterId,
   monsters,
@@ -52,6 +54,7 @@ export function BattleRoomScreen({
   onWithdraw,
   onBattle,
   onBackLobby,
+  onSendChat,
 }: {
   accountAddress?: string;
   match: ArenaMatch | null;
@@ -63,6 +66,7 @@ export function BattleRoomScreen({
   resolution: MatchResolution | null;
   roomParticipants: RoomParticipant[];
   roomNotices: RoomNotice[];
+  roomMessages: RoomChatMessage[];
   roomModel: RoomModel;
   selectedMonsterId: string;
   monsters: Monster[];
@@ -78,7 +82,9 @@ export function BattleRoomScreen({
   onWithdraw: () => void;
   onBattle: () => void;
   onBackLobby: () => void;
+  onSendChat: (text: string) => boolean;
 }) {
+  const [chatDraft, setChatDraft] = useState('');
   const playerAAddress = match?.player_a ?? roomParticipants[0]?.address;
   const playerBAddress = match?.player_b ?? roomParticipants.find((participant) => participant.address !== playerAAddress)?.address;
   const roomLeader = roomParticipants.find((participant) => participant.address !== accountAddress);
@@ -93,6 +99,16 @@ export function BattleRoomScreen({
   const totalStakeSui = match ? toSui((BigInt(match.stake_a || '0') + BigInt(match.stake_b || '0')).toString()) : '0.0000';
   const showSetupPanels = Boolean(match && !roomModel.playerDeposited && match.status === 0);
   const showLoadoutSummary = !showSetupPanels;
+  const quickMessages = useMemo(
+    () => [
+      'I will open the room.',
+      'You open the room.',
+      'Deposit your legend now.',
+      'I am ready to battle.',
+      'Withdraw if you want to switch.',
+    ],
+    []
+  );
 
   const connectionLabel = roomConnectionState === 'open'
     ? 'Room Live'
@@ -228,6 +244,15 @@ export function BattleRoomScreen({
       statusTone: roomIsConnected ? 'border-yellow-300/25 bg-yellow-500/10 text-yellow-100' : 'border-red-300/25 bg-red-500/10 text-red-100',
     };
   })();
+
+  const handleSendChat = (text: string) => {
+    const next = text.trim();
+    if (!next) return;
+    const sent = onSendChat(next);
+    if (sent) {
+      setChatDraft('');
+    }
+  };
 
   return (
     <div className="space-y-4 pb-40 sm:pb-44">
@@ -485,6 +510,85 @@ export function BattleRoomScreen({
           </div>
         </section>
       ) : null}
+
+      <section className="glass-card space-y-4 p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Room Chat</div>
+            <div className="mt-1 text-xl font-black text-white">Talk through the next move</div>
+          </div>
+          <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-gray-200">
+            {roomMessages.length} msgs
+          </div>
+        </div>
+
+        <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+          {quickMessages.map((message) => (
+            <button
+              key={message}
+              className="shrink-0 rounded-full border border-cyan/25 bg-cyan/10 px-3 py-2 text-xs font-black uppercase tracking-[0.1em] text-cyan-50 disabled:opacity-50"
+              onClick={() => handleSendChat(message)}
+              disabled={!roomIsConnected || actionDisabled}
+            >
+              {message}
+            </button>
+          ))}
+        </div>
+
+        <div className="rounded-[22px] border border-white/10 bg-black/20 p-3">
+          {roomMessages.length === 0 ? (
+            <div className="px-2 py-6 text-center text-sm text-gray-400">
+              No messages yet. Use chat to agree on wager, room opening, or who taps battle.
+            </div>
+          ) : (
+            <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+              {[...roomMessages].reverse().map((message) => {
+                const own = message.address === accountAddress;
+                return (
+                  <div
+                    key={message.id}
+                    className={`rounded-[18px] border px-4 py-3 ${own ? 'border-cyan/30 bg-cyan/10' : 'border-white/10 bg-white/5'}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs font-black uppercase tracking-[0.14em] text-white/70">
+                        {own ? 'You' : short(message.address)}
+                      </div>
+                      <div className="text-[11px] text-gray-400">
+                        {new Date(message.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                      </div>
+                    </div>
+                    <div className="mt-2 text-sm leading-6 text-white">{message.text}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+          <input
+            className="min-h-[60px] rounded-[18px] border border-borderSoft bg-black/20 px-4 text-base text-white outline-none transition focus:border-cyan/50"
+            placeholder="Type a room message..."
+            value={chatDraft}
+            onChange={(event) => setChatDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                handleSendChat(chatDraft);
+              }
+            }}
+            disabled={!roomIsConnected || actionDisabled}
+            maxLength={280}
+          />
+          <button
+            className="min-h-[60px] rounded-[18px] bg-gradient-to-r from-cyan-400 to-blue-500 px-5 text-base font-black uppercase tracking-[0.14em] text-slate-950 disabled:opacity-50"
+            onClick={() => handleSendChat(chatDraft)}
+            disabled={!roomIsConnected || actionDisabled || !chatDraft.trim()}
+          >
+            Send
+          </button>
+        </div>
+      </section>
 
       <div className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-borderSoft bg-background/95 px-4 py-3 shadow-[0_-18px_40px_rgba(0,0,0,0.28)] backdrop-blur-xl">
         <div className="mx-auto max-w-5xl space-y-3">

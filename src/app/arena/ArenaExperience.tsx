@@ -93,6 +93,7 @@ export function ArenaExperience() {
   const roomIsConnected = room.isConnected;
   const roomSetSelection = room.setSelection;
   const roomSetStake = room.setStake;
+  const roomSendChat = room.sendChat;
 
   const resetToLobby = useCallback(() => {
     setActiveMatch(null);
@@ -630,6 +631,7 @@ export function ArenaExperience() {
           resolution={resolution}
           roomParticipants={room.participants}
           roomNotices={room.notices}
+          roomMessages={room.messages}
           roomModel={roomModel}
           selectedMonsterId={selectedMonster?.objectId ?? ''}
           monsters={monsters}
@@ -645,6 +647,7 @@ export function ArenaExperience() {
           onWithdraw={handleWithdraw}
           onBattle={resolveBattle}
           onBackLobby={handleBackLobby}
+          onSendChat={roomSendChat}
         />
       ) : (
         <BattleArenaScreen

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { buildArenaSocketUrl } from './socket';
-import type { LobbyConnectionState, RoomParticipant, RoomState, RoomNotice } from './types';
+import type { LobbyConnectionState, RoomParticipant, RoomState, RoomNotice, RoomChatMessage } from './types';
 
 type UseRoomPresenceOptions = {
   enabled: boolean;
@@ -22,6 +22,7 @@ export function useRoomPresence({ enabled, roomId, address }: UseRoomPresenceOpt
   const [connectionState, setConnectionState] = useState<LobbyConnectionState>('closed');
   const [participants, setParticipants] = useState<RoomParticipant[]>([]);
   const [notices, setNotices] = useState<RoomNotice[]>([]);
+  const [messages, setMessages] = useState<RoomChatMessage[]>([]);
   const [roomReady, setRoomReady] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
@@ -56,6 +57,7 @@ export function useRoomPresence({ enabled, roomId, address }: UseRoomPresenceOpt
       setConnectionState('closed');
       setParticipants([]);
       setNotices([]);
+      setMessages([]);
       setRoomReady(false);
       return;
     }
@@ -84,6 +86,7 @@ export function useRoomPresence({ enabled, roomId, address }: UseRoomPresenceOpt
           if (payload.type === 'roomState' && payload.room) {
             setParticipants(payload.room.participants ?? []);
             setNotices(payload.room.notices ?? []);
+            setMessages(payload.room.messages ?? []);
             setRoomReady(Boolean(payload.room.roomReady));
             return;
           }
@@ -148,16 +151,26 @@ export function useRoomPresence({ enabled, roomId, address }: UseRoomPresenceOpt
     [address, send]
   );
 
+  const sendChat = useCallback(
+    (text: string) => {
+      if (!address) return false;
+      return send({ type: 'roomChat', address, text });
+    },
+    [address, send]
+  );
+
   return {
     endpoint,
     connectionState,
     isConnected: connectionState === 'open',
     participants,
     notices,
+    messages,
     roomReady,
     lastError,
     setSelection,
     setStake,
     setReady,
+    sendChat,
   };
 }

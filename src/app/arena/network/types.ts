@@ -73,10 +73,18 @@ export type RoomNotice = {
   tone: 'info' | 'warn' | 'success';
 };
 
+export type RoomChatMessage = {
+  id: string;
+  address: string;
+  text: string;
+  timestamp: number;
+};
+
 export type RoomState = {
   createdAt: number;
   updatedAt: number;
   participants: RoomParticipant[];
   notices: RoomNotice[];
+  messages: RoomChatMessage[];
   roomReady: boolean;
 };

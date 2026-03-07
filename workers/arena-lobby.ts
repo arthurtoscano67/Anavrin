@@ -62,6 +62,13 @@ export type RoomNotice = {
   tone: "info" | "warn" | "success";
 };
 
+export type RoomChatMessage = {
+  id: string;
+  address: string;
+  text: string;
+  timestamp: number;
+};
+
 type JoinMessage = {
   type: "join";
   address: string;
@@ -139,6 +146,12 @@ type RoomReadyMessage = {
   ready: boolean;
 };
 
+type RoomChatMessageEnvelope = {
+  type: "roomChat";
+  address: string;
+  text: string;
+};
+
 type PingMessage = {
   type: "ping";
 };
@@ -155,6 +168,7 @@ type ClientMessage =
   | RoomSelectMessage
   | RoomStakeMessage
   | RoomReadyMessage
+  | RoomChatMessageEnvelope
   | PingMessage;
 
 type Session = {
@@ -164,12 +178,14 @@ type Session = {
 type StoredRoomState = {
   participants: RoomParticipant[];
   notices: RoomNotice[];
+  messages: RoomChatMessage[];
   createdAt: number;
 };
 
 const MAX_RECENT_MATCHES = 20;
 const MAX_INVITES = 200;
 const MAX_ROOM_NOTICES = 18;
+const MAX_ROOM_MESSAGES = 30;
 const ROOM_STATE_KEY = "roomState";
 const ONLINE_WINDOW_MS = 20_000;
 
@@ -208,6 +224,7 @@ export class ArenaLobby {
   private roomSessions = new Map<WebSocket, Session>();
   private roomParticipants = new Map<string, RoomParticipant>();
   private roomNotices: RoomNotice[] = [];
+  private roomMessages: RoomChatMessage[] = [];
   private roomCreatedAt = Date.now();
 
   constructor(private readonly state: DurableObjectState) {
@@ -216,6 +233,7 @@ export class ArenaLobby {
       if (!stored) return;
       this.roomCreatedAt = stored.createdAt || Date.now();
       this.roomNotices = stored.notices || [];
+      this.roomMessages = stored.messages || [];
       this.roomParticipants = new Map((stored.participants || []).map((participant) => [participant.address, participant]));
     });
   }
@@ -340,6 +358,9 @@ export class ArenaLobby {
         return;
       case "roomReady":
         this.handleRoomReady(socket, message);
+        return;
+      case "roomChat":
+        this.handleRoomChat(socket, message);
         return;
       case "ping":
         this.touchRoomSession(socket);
@@ -718,6 +739,23 @@ export class ArenaLobby {
     this.broadcastRoomState();
   }
 
+  private handleRoomChat(socket: WebSocket, message: RoomChatMessageEnvelope) {
+    if (!isAddress(message.address)) return;
+    const session = this.roomSessions.get(socket);
+    if (session?.address !== message.address) return;
+
+    const participant = this.ensureRoomParticipant(message.address);
+    participant.lastSeen = Date.now();
+    participant.present = true;
+
+    const text = String(message.text ?? "").trim().replace(/\s+/g, " ");
+    if (!text) return;
+
+    this.pushRoomMessage(message.address, text.slice(0, 280));
+    this.persistRoomState();
+    this.broadcastRoomState();
+  }
+
   private ensureRoomParticipant(address: string): RoomParticipant {
     const existing = this.roomParticipants.get(address);
     if (existing) return existing;
@@ -806,6 +844,19 @@ export class ArenaLobby {
     }
   }
 
+  private pushRoomMessage(address: string, text: string) {
+    const item: RoomChatMessage = {
+      id: nextId("room_chat"),
+      address,
+      text,
+      timestamp: Date.now(),
+    };
+    this.roomMessages.unshift(item);
+    if (this.roomMessages.length > MAX_ROOM_MESSAGES) {
+      this.roomMessages.length = MAX_ROOM_MESSAGES;
+    }
+  }
+
   private broadcastLobbyState() {
     this.sweepLobbyPresence();
     for (const socket of this.sessions.keys()) {
@@ -853,6 +904,7 @@ export class ArenaLobby {
         updatedAt: Date.now(),
         participants,
         notices: this.roomNotices,
+        messages: this.roomMessages,
         roomReady: participants.filter((participant) => participant.ready).length >= 2,
       },
     });
@@ -909,6 +961,7 @@ export class ArenaLobby {
     void this.state.storage.put(ROOM_STATE_KEY, {
       participants: [...this.roomParticipants.values()],
       notices: this.roomNotices,
+      messages: this.roomMessages,
       createdAt: this.roomCreatedAt,
     } satisfies StoredRoomState);
   }
