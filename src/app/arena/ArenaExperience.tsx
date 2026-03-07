@@ -486,11 +486,6 @@ export function ArenaExperience() {
     resetToLobby();
   }, [resetToLobby]);
 
-  const handleOpenBattle = useCallback(() => {
-    if (!roomModel.canStartBattle && !resolution) return;
-    arena.setScreen('battle');
-  }, [arena, resolution, roomModel.canStartBattle]);
-
   const liveMatches = useMemo(
     () => arenaMatches.activeMatches.filter((match) => match.objectId !== arena.currentMatchId).slice(0, 6),
     [arena.currentMatchId, arenaMatches.activeMatches]
@@ -614,7 +609,7 @@ export function ArenaExperience() {
           onDeposit={handleDeposit}
           onWithdraw={handleWithdraw}
           onToggleReady={handleToggleReady}
-          onOpenBattle={handleOpenBattle}
+          onBattle={resolveBattle}
           onBackLobby={handleBackLobby}
         />
       ) : (

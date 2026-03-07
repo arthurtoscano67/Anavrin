@@ -36,7 +36,7 @@ export function BattleRoomScreen({
   onDeposit,
   onWithdraw,
   onToggleReady,
-  onOpenBattle,
+  onBattle,
   onBackLobby,
 }: {
   accountAddress?: string;
@@ -60,7 +60,7 @@ export function BattleRoomScreen({
   onDeposit: () => void;
   onWithdraw: () => void;
   onToggleReady: () => void;
-  onOpenBattle: () => void;
+  onBattle: () => void;
   onBackLobby: () => void;
 }) {
   const playerA = match?.player_a;
@@ -78,6 +78,19 @@ export function BattleRoomScreen({
   const sideAStateLabel = roomModel.playerAReady ? 'Ready' : sideAHasMonster ? 'Deposited' : playerAAddress ? 'Waiting' : 'Open';
   const sideBStateLabel = roomModel.playerBReady ? 'Ready' : sideBHasMonster ? 'Deposited' : playerBAddress ? 'Waiting' : 'Open';
   const showBattleButton = roomModel.bothReady && Boolean(currentMatchId);
+  const actionDisabled = pending !== null;
+  const withdrawLocked = Boolean(match?.status === 1 || match?.status === 2 || match?.status === 3);
+  const actionSummary = showBattleButton
+    ? 'Both trainers are ready. Launch the battle from this room.'
+    : roomModel.canReady
+      ? 'Tap READY. When both sides are ready, BATTLE NOW lights up.'
+      : roomModel.canWithdraw
+        ? 'You can still withdraw until both monsters are deposited.'
+        : withdrawLocked
+          ? 'Room locked after both deposits. Withdraw is disabled by the contract.'
+          : roomCanOpen
+            ? 'Both trainers are here. Open the room on-chain to unlock deposits.'
+            : 'Pick your legend, deposit, then get ready.';
 
   const ActionBadge = ({
     label,
@@ -136,7 +149,7 @@ export function BattleRoomScreen({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-40 sm:pb-44">
       <section className="glass-card space-y-4 p-5 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -160,6 +173,21 @@ export function BattleRoomScreen({
           </div>
         ) : null}
       </section>
+
+      {showBattleButton ? (
+        <section className="glass-card rounded-[28px] border border-fuchsia-300/30 bg-gradient-to-r from-fuchsia-500/15 to-pink-500/10 p-4 sm:p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-fuchsia-100">Battle Ready</div>
+              <div className="mt-2 text-2xl font-black text-white">Both legends are ready to fight.</div>
+              <div className="mt-1 text-sm text-fuchsia-50/85">Stay in this room and tap the battle button below.</div>
+            </div>
+            <div className="rounded-full border border-fuchsia-200/35 bg-fuchsia-500/15 px-4 py-2 text-sm font-black uppercase tracking-[0.16em] text-fuchsia-50">
+              LIVE
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="arena-stage overflow-hidden rounded-[32px] border border-borderSoft p-4 sm:p-6">
         <div className="relative z-10 grid gap-4 lg:grid-cols-[1fr_120px_1fr] lg:items-center">
@@ -213,16 +241,16 @@ export function BattleRoomScreen({
                     label="Withdraw"
                     tone="red"
                     active={Boolean(match?.status === 0 && sideAHasMonster)}
-                    disabled={pending !== null || !roomModel.canWithdraw}
+                    disabled={actionDisabled || !roomModel.canWithdraw}
                     onClick={onWithdraw}
                   />
                   {showBattleButton ? (
                     <ActionButton
-                      label="Battle"
+                      label="Battle Now"
                       tone="pink"
                       active
-                      disabled={pending !== null}
-                      onClick={onOpenBattle}
+                      disabled={actionDisabled}
+                      onClick={onBattle}
                     />
                   ) : null}
                 </>
@@ -261,16 +289,16 @@ export function BattleRoomScreen({
                     label="Withdraw"
                     tone="red"
                     active={Boolean(match?.status === 0 && sideBHasMonster)}
-                    disabled={pending !== null || !roomModel.canWithdraw}
+                    disabled={actionDisabled || !roomModel.canWithdraw}
                     onClick={onWithdraw}
                   />
                   {showBattleButton ? (
                     <ActionButton
-                      label="Battle"
+                      label="Battle Now"
                       tone="pink"
                       active
-                      disabled={pending !== null}
-                      onClick={onOpenBattle}
+                      disabled={actionDisabled}
+                      onClick={onBattle}
                     />
                   ) : null}
                 </>
@@ -342,35 +370,36 @@ export function BattleRoomScreen({
         </section>
       ) : null}
 
-      <div className="safe-bottom sticky bottom-0 z-20 -mx-4 border-t border-borderSoft bg-background/95 px-4 py-3 backdrop-blur-xl">
-        <div className="mx-auto grid max-w-5xl grid-cols-1 gap-3 sm:grid-cols-4">
+      <div className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-borderSoft bg-background/95 px-4 py-3 shadow-[0_-18px_40px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+        <div className="mx-auto max-w-5xl space-y-3">
+          <div className="rounded-[20px] border border-white/10 bg-white/5 px-4 py-3 text-center text-sm font-semibold text-gray-200">
+            {actionSummary}
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <button
             className="min-h-[68px] rounded-[22px] border border-red-300/35 bg-red-500/15 text-lg font-black text-red-100 disabled:opacity-50"
             onClick={onWithdraw}
-            disabled={!roomModel.canWithdraw || pending !== null}
+            disabled={!roomModel.canWithdraw || actionDisabled}
           >
-            WITHDRAW
+            {roomModel.canWithdraw ? 'WITHDRAW' : withdrawLocked ? 'LOCKED' : 'WITHDRAW'}
           </button>
           <button
-            className={`min-h-[68px] rounded-[22px] text-lg font-black disabled:opacity-50 ${roomModel.canReady ? 'arena-ready-glow border border-green-300/35 bg-green-500/20 text-green-50' : 'border border-borderSoft bg-black/20 text-gray-300'}`}
+            className={`min-h-[68px] rounded-[22px] text-lg font-black disabled:opacity-50 ${roomModel.canReady || (roomModel.playerAReady || roomModel.playerBReady) ? 'arena-ready-glow border border-green-300/35 bg-green-500/20 text-green-50' : 'border border-borderSoft bg-black/20 text-gray-300'}`}
             onClick={onToggleReady}
-            disabled={!roomModel.canReady || pending !== null}
+            disabled={!roomModel.canReady || actionDisabled}
           >
-            READY
+            {(youArePlayerA && roomModel.playerAReady) || (youArePlayerB && roomModel.playerBReady) ? 'READY!' : 'READY'}
           </button>
           <button
-            className={`min-h-[68px] rounded-[22px] text-lg font-black disabled:opacity-50 ${roomModel.bothReady ? 'bg-gradient-to-r from-fuchsia-400 to-pink-500 text-slate-950' : 'border border-borderSoft bg-black/20 text-gray-300'}`}
-            onClick={showBattleButton ? onOpenBattle : roomCanOpen ? onCreateRoomMatch : onDeposit}
-            disabled={pending !== null || (showBattleButton ? false : roomCanOpen ? false : roomWaitingForTrainer || !roomModel.canDeposit || !currentMatchId)}
+            className={`min-h-[68px] rounded-[22px] text-lg font-black disabled:opacity-50 ${roomModel.bothReady ? 'arena-ready-glow bg-gradient-to-r from-fuchsia-400 to-pink-500 text-slate-950' : 'border border-borderSoft bg-black/20 text-gray-300'}`}
+            onClick={showBattleButton ? onBattle : roomCanOpen ? onCreateRoomMatch : onDeposit}
+            disabled={actionDisabled || (showBattleButton ? false : roomCanOpen ? false : roomWaitingForTrainer || !roomModel.canDeposit || !currentMatchId)}
           >
-            {showBattleButton ? 'BATTLE' : roomCanOpen ? 'OPEN ROOM' : roomWaitingForTrainer ? 'WAITING FOR TRAINER' : 'DEPOSIT'}
+            {showBattleButton ? 'BATTLE NOW' : roomCanOpen ? 'OPEN ROOM' : roomWaitingForTrainer ? 'WAITING' : roomModel.playerDeposited ? 'DEPOSITED' : 'DEPOSIT'}
           </button>
-          <div className="grid place-items-center rounded-[22px] border border-white/10 bg-white/5 px-4 text-center text-sm font-semibold text-gray-300">
-            {showBattleButton
-              ? 'Both legends are ready. Enter battle now.'
-              : roomCanOpen
-                ? 'Both trainers are here. Open the battle room to unlock deposits.'
-                : 'Battle unlocks when both trainers deposit and tap READY.'}
+          <div className={`grid place-items-center rounded-[22px] border px-4 text-center text-sm font-semibold ${showBattleButton ? 'border-fuchsia-300/35 bg-fuchsia-500/15 text-fuchsia-50' : 'border-white/10 bg-white/5 text-gray-300'}`}>
+            {showBattleButton ? 'GO TIME' : roomModel.canReady ? 'READY UP' : roomModel.playerDeposited ? 'WAITING' : 'PICK LEGEND'}
+          </div>
           </div>
         </div>
       </div>
