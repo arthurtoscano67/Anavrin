@@ -1,37 +1,56 @@
 import { short } from '../../lib/format';
 import type { ArenaMatch, Monster } from '../../lib/types';
-import type { LobbyInvite, LobbyOpenMatch, LobbyPlayer } from '../network/types';
+import type { LobbyConnectionState, LobbyInvite, LobbyOpenMatch, LobbyPlayer } from '../network/types';
 import { MonsterImage } from '../../components/MonsterImage';
 import { StageBadge } from '../../components/StageBadge';
 import { spectatorSummary } from '../battle-engine/battleEngine';
 
 export function LobbyScreen({
+  totalPlayers,
   players,
+  selfPlayer,
   invites,
   openMatches,
   liveMatches,
   selectedMonsterId,
   monsters,
   pending,
+  connectionState,
+  lastError,
   onPickMonster,
   onInvite,
   onAcceptInvite,
   onJoinOpenMatch,
   onWatchMatch,
 }: {
+  totalPlayers: number;
   players: LobbyPlayer[];
+  selfPlayer?: LobbyPlayer | null;
   invites: LobbyInvite[];
   openMatches: LobbyOpenMatch[];
   liveMatches: ArenaMatch[];
   selectedMonsterId: string;
   monsters: Monster[];
   pending: string | null;
+  connectionState: LobbyConnectionState;
+  lastError?: string | null;
   onPickMonster: (monsterId: string) => void;
   onInvite: (address: string) => void;
   onAcceptInvite: (invite: LobbyInvite) => void;
   onJoinOpenMatch: (match: LobbyOpenMatch) => void;
   onWatchMatch: (matchId: string) => void;
 }) {
+  const statusTone = connectionState === 'open'
+    ? 'border-green-300/30 bg-green-500/10 text-green-100'
+    : connectionState === 'connecting'
+      ? 'border-yellow-300/30 bg-yellow-500/10 text-yellow-100'
+      : 'border-red-300/30 bg-red-500/10 text-red-100';
+  const statusLabel = connectionState === 'open'
+    ? 'Live'
+    : connectionState === 'connecting'
+      ? 'Connecting'
+      : 'Offline';
+
   return (
     <div className="space-y-4">
       <section className="glass-card space-y-4 p-5 sm:p-6">
@@ -62,14 +81,34 @@ export function LobbyScreen({
         <div className="flex items-center justify-between gap-3 rounded-[24px] border border-borderSoft bg-black/20 px-4 py-3">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Players Online</div>
-            <div className="mt-1 text-3xl font-black text-white">{players.length}</div>
+            <div className="mt-1 text-3xl font-black text-white">{totalPlayers}</div>
           </div>
-          <div className="rounded-full border border-green-300/30 bg-green-500/10 px-4 py-2 text-sm font-black text-green-100">Live</div>
+          <div className={`rounded-full border px-4 py-2 text-sm font-black ${statusTone}`}>{statusLabel}</div>
         </div>
 
+        {lastError && connectionState !== 'open' ? (
+          <div className="rounded-[20px] border border-red-300/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+            {lastError}
+          </div>
+        ) : null}
+
         <div className="space-y-3">
+          {selfPlayer ? (
+            <article className="flex items-center justify-between gap-3 rounded-[24px] border border-green-300/20 bg-green-500/5 px-4 py-4">
+              <div className="min-w-0">
+                <div className="text-xl font-black text-white">🟢 {short(selfPlayer.address)} <span className="text-sm text-green-200">YOU</span></div>
+                <div className="mt-1 truncate text-sm text-gray-300">{selfPlayer.monsterName} • Level {selfPlayer.level}</div>
+              </div>
+              <div className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black uppercase tracking-[0.14em] text-gray-200">
+                Online
+              </div>
+            </article>
+          ) : null}
+
           {players.length === 0 ? (
-            <div className="rounded-[24px] border border-borderSoft bg-black/20 p-4 text-center text-gray-400">No trainers online right now.</div>
+            <div className="rounded-[24px] border border-borderSoft bg-black/20 p-4 text-center text-gray-400">
+              {selfPlayer ? 'Only you are online right now.' : 'No trainers online right now.'}
+            </div>
           ) : (
             players.map((player) => (
               <article key={player.address} className="flex items-center justify-between gap-3 rounded-[24px] border border-borderSoft bg-black/20 px-4 py-4">

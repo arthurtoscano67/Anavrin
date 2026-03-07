@@ -428,6 +428,10 @@ export function ArenaExperience() {
     [arena.currentMatchId, arenaMatches.activeMatches]
   );
 
+  const selfPlayer = useMemo(
+    () => lobby.players.find((player) => player.address === account?.address) ?? null,
+    [account?.address, lobby.players]
+  );
   const playerList = useMemo(
     () => lobby.players.filter((player) => player.address !== account?.address),
     [account?.address, lobby.players]
@@ -494,13 +498,17 @@ export function ArenaExperience() {
         <LoadingGrid count={3} />
       ) : arena.screen === 'lobby' ? (
         <LobbyScreen
+          totalPlayers={lobby.players.length}
           players={playerList}
+          selfPlayer={selfPlayer}
           invites={lobby.invites.filter((invite) => invite.to === account.address && invite.status === 'pending')}
           openMatches={lobby.openMatches.filter((match) => match.creator !== account.address)}
           liveMatches={liveMatches}
           selectedMonsterId={selectedMonster?.objectId ?? ''}
           monsters={monsters}
           pending={pending}
+          connectionState={lobby.connectionState}
+          lastError={lobby.lastError}
           onPickMonster={setSelectedMonsterId}
           onInvite={handleInvite}
           onAcceptInvite={handleAcceptInvite}
