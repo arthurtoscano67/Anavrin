@@ -170,6 +170,23 @@ export function ArenaExperience() {
     }
   }, [arena, arenaMatches, client, setParams]);
 
+  const refreshMatchState = useCallback(async (matchId: string) => {
+    if (!matchId) return;
+    try {
+      const [match, nextResolution] = await Promise.all([
+        fetchArenaMatch(client, matchId),
+        fetchMatchResolution(client, matchId),
+      ]);
+      setActiveMatch(match);
+      setResolution(nextResolution);
+      if (nextResolution || match?.status === 2) {
+        arena.setScreen('battle');
+      }
+    } catch {
+      // Silent background refresh.
+    }
+  }, [arena, client]);
+
   useEffect(() => {
     const urlMonster = params.get('monster');
     if (urlMonster) setSelectedMonsterId(urlMonster);
@@ -223,6 +240,19 @@ export function ArenaExperience() {
     if (!arena.currentMatchId || activeMatch?.objectId === arena.currentMatchId) return;
     void loadMatch(arena.currentMatchId, arena.screen === 'battle' ? 'battle' : 'room');
   }, [activeMatch?.objectId, arena.currentMatchId, arena.screen, loadMatch]);
+
+  useEffect(() => {
+    if (!arena.currentMatchId) return;
+    if (pending === 'load' || pending === 'deposit' || pending === 'withdraw' || pending === 'battle' || pending === 'create-room') {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void refreshMatchState(arena.currentMatchId);
+    }, 3_500);
+
+    return () => window.clearInterval(intervalId);
+  }, [arena.currentMatchId, pending, refreshMatchState]);
 
   useEffect(() => {
     if (arena.currentRoomId) return;

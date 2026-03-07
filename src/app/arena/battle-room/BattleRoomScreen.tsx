@@ -97,6 +97,44 @@ export function BattleRoomScreen({
     </span>
   );
 
+  const ActionButton = ({
+    label,
+    tone = 'neutral',
+    active = false,
+    disabled = false,
+    onClick,
+  }: {
+    label: string;
+    tone?: 'neutral' | 'green' | 'pink' | 'red';
+    active?: boolean;
+    disabled?: boolean;
+    onClick?: () => void;
+  }) => {
+    const toneClass = tone === 'green'
+      ? active
+        ? 'border-green-300/45 bg-green-500/20 text-green-50'
+        : 'border-green-300/25 bg-green-500/10 text-green-100'
+      : tone === 'pink'
+        ? active
+          ? 'border-pink-300/45 bg-pink-500/20 text-pink-50'
+          : 'border-pink-300/25 bg-pink-500/10 text-pink-100'
+        : tone === 'red'
+          ? 'border-red-300/35 bg-red-500/15 text-red-100'
+          : active
+            ? 'border-white/20 bg-white/15 text-white'
+            : 'border-white/10 bg-white/5 text-gray-200';
+
+    return (
+      <button
+        className={`min-h-[48px] rounded-full border px-4 text-sm font-black uppercase tracking-[0.14em] transition disabled:opacity-45 ${toneClass}`}
+        onClick={onClick}
+        disabled={disabled}
+      >
+        {label}
+      </button>
+    );
+  };
+
   return (
     <div className="space-y-4">
       <section className="glass-card space-y-4 p-5 sm:p-6">
@@ -155,9 +193,46 @@ export function BattleRoomScreen({
               {youArePlayerA ? <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-black text-white">YOU</span> : null}
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              <ActionBadge label="Deposit" active={Boolean(match?.mon_a)} />
-              <ActionBadge label="Ready" active={roomModel.playerAReady} />
-              <ActionBadge label="Withdraw" active={Boolean(match?.mon_a && match?.status === 0)} />
+              {youArePlayerA ? (
+                <>
+                  <ActionButton
+                    label={sideAHasMonster ? 'Deposited' : 'Deposit'}
+                    tone="neutral"
+                    active={sideAHasMonster}
+                    disabled={pending !== null || !roomModel.canDeposit}
+                    onClick={onDeposit}
+                  />
+                  <ActionButton
+                    label={roomModel.playerAReady ? 'Ready!' : 'Ready'}
+                    tone="green"
+                    active={roomModel.playerAReady}
+                    disabled={pending !== null || !roomModel.canReady}
+                    onClick={onToggleReady}
+                  />
+                  <ActionButton
+                    label="Withdraw"
+                    tone="red"
+                    active={Boolean(match?.status === 0 && sideAHasMonster)}
+                    disabled={pending !== null || !roomModel.canWithdraw}
+                    onClick={onWithdraw}
+                  />
+                  {showBattleButton ? (
+                    <ActionButton
+                      label="Battle"
+                      tone="pink"
+                      active
+                      disabled={pending !== null}
+                      onClick={onOpenBattle}
+                    />
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <ActionBadge label="Deposit" active={sideAHasMonster} />
+                  <ActionBadge label="Ready" active={roomModel.playerAReady} />
+                  <ActionBadge label="Withdraw" active={Boolean(sideAHasMonster && match?.status === 0)} />
+                </>
+              )}
             </div>
           </div>
           <div className="rounded-[22px] border border-white/10 bg-black/25 p-4">
@@ -166,9 +241,46 @@ export function BattleRoomScreen({
               {youArePlayerB ? <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-black text-white">YOU</span> : null}
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              <ActionBadge label="Deposit" active={Boolean(match?.mon_b)} />
-              <ActionBadge label="Ready" active={roomModel.playerBReady} />
-              <ActionBadge label="Withdraw" active={Boolean(match?.mon_b && match?.status === 0)} />
+              {youArePlayerB ? (
+                <>
+                  <ActionButton
+                    label={sideBHasMonster ? 'Deposited' : 'Deposit'}
+                    tone="neutral"
+                    active={sideBHasMonster}
+                    disabled={pending !== null || !roomModel.canDeposit}
+                    onClick={onDeposit}
+                  />
+                  <ActionButton
+                    label={roomModel.playerBReady ? 'Ready!' : 'Ready'}
+                    tone="green"
+                    active={roomModel.playerBReady}
+                    disabled={pending !== null || !roomModel.canReady}
+                    onClick={onToggleReady}
+                  />
+                  <ActionButton
+                    label="Withdraw"
+                    tone="red"
+                    active={Boolean(match?.status === 0 && sideBHasMonster)}
+                    disabled={pending !== null || !roomModel.canWithdraw}
+                    onClick={onWithdraw}
+                  />
+                  {showBattleButton ? (
+                    <ActionButton
+                      label="Battle"
+                      tone="pink"
+                      active
+                      disabled={pending !== null}
+                      onClick={onOpenBattle}
+                    />
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <ActionBadge label="Deposit" active={sideBHasMonster} />
+                  <ActionBadge label="Ready" active={roomModel.playerBReady} />
+                  <ActionBadge label="Withdraw" active={Boolean(sideBHasMonster && match?.status === 0)} />
+                </>
+              )}
             </div>
           </div>
         </div>
