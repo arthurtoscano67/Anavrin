@@ -2,12 +2,25 @@ function toWsProtocol(protocol: string): string {
   return protocol === 'https:' ? 'wss:' : 'ws:';
 }
 
-export function buildArenaSocketUrl(path: string): string {
+function toHttpProtocol(protocol: string): string {
+  return protocol === 'https:' ? 'https:' : 'http:';
+}
+
+function configuredBaseUrl() {
   const configured = (import.meta.env.VITE_LOBBY_WS_URL as string | undefined)?.trim();
+  if (!configured) return null;
+
+  const httpUrl = configured.replace(/^wss?:/i, (match) => (match.toLowerCase() === 'wss:' ? 'https:' : 'http:'));
+  const url = new URL(httpUrl);
+  url.search = '';
+  return url;
+}
+
+export function buildArenaSocketUrl(path: string): string {
+  const configured = configuredBaseUrl();
 
   if (configured) {
-    const httpUrl = configured.replace(/^wss?:/i, (match) => (match.toLowerCase() === 'wss:' ? 'https:' : 'http:'));
-    const url = new URL(httpUrl);
+    const url = new URL(configured.toString());
     url.pathname = path;
     url.search = '';
     return url.toString().replace(/^https?:/i, (match) => (match.toLowerCase() === 'https:' ? 'wss:' : 'ws:'));
@@ -18,4 +31,20 @@ export function buildArenaSocketUrl(path: string): string {
   }
 
   return `ws://127.0.0.1:8787${path}`;
+}
+
+export function buildArenaHttpUrl(path: string): string {
+  const configured = configuredBaseUrl();
+  if (configured) {
+    const url = new URL(configured.toString());
+    url.pathname = path;
+    url.search = '';
+    return url.toString();
+  }
+
+  if (typeof window !== 'undefined') {
+    return `${toHttpProtocol(window.location.protocol)}//${window.location.host}${path}`;
+  }
+
+  return `http://127.0.0.1:8787${path}`;
 }

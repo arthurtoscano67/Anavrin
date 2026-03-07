@@ -1,95 +1,38 @@
-export type LobbyPlayer = {
-  address: string;
-  monsterName: string;
-  level: number;
-  joinedAt: number;
-  lastSeen: number;
-};
-
-export type OpenMatch = {
-  id: string;
-  creator: string;
-  creatorMonster: string;
-  creatorLevel: number;
-  stakeSui: string;
-  createdAt: number;
-};
-
-export type LobbyInvite = {
-  id: string;
-  from: string;
-  to: string;
-  roomId: string;
-  monsterName: string;
-  level: number;
-  createdAt: number;
-  status: "pending" | "accepted" | "declined";
-};
-
-export type RecentMatch = {
-  id: string;
-  summary: string;
-  timestamp: number;
-};
-
-export type StartedMatch = {
-  id: string;
-  from: string;
-  to: string;
-  roomId?: string;
-  openMatchId?: string;
-  inviteId?: string;
-  matchId?: string;
-  startedAt: number;
-};
-
-export type RoomParticipant = {
-  address: string;
-  joinedAt: number;
-  lastSeen: number;
-  present: boolean;
-  monsterId?: string;
-  monsterName?: string;
-  stage?: number;
-  stakeSui?: string;
-  ready: boolean;
-};
-
-export type RoomNotice = {
-  id: string;
-  summary: string;
-  timestamp: number;
-  tone: "info" | "warn" | "success";
-};
-
-export type RoomChatMessage = {
-  id: string;
-  address: string;
-  text: string;
-  timestamp: number;
-};
+import type {
+  BattleListKind,
+  BattleSummary,
+  LobbyInvite,
+  LobbyOpenMatch,
+  LobbyPlayer,
+  LobbyRecentMatch,
+  QueueEntry,
+  QueueMatch,
+  RoomChatMessage,
+  RoomNotice,
+  RoomParticipant,
+} from '../src/app/arena/network/types';
 
 type JoinMessage = {
-  type: "join";
+  type: 'join';
   address: string;
   monsterName: string;
   level: number;
 };
 
 type LeaveMessage = {
-  type: "leave";
+  type: 'leave';
   address: string;
 };
 
 type InviteMessage = {
-  type: "invite";
+  type: 'invite';
   from: string;
   to: string;
   roomId?: string;
 };
 
 type InviteAcceptedMessage = {
-  type: "inviteAccepted";
+  type: 'inviteAccepted';
   inviteId: string;
   from: string;
   to: string;
@@ -97,7 +40,7 @@ type InviteAcceptedMessage = {
 };
 
 type MatchCreatedMessage = {
-  type: "matchCreated";
+  type: 'matchCreated';
   creator: string;
   opponent?: string;
   stakeSui?: string;
@@ -107,27 +50,57 @@ type MatchCreatedMessage = {
 };
 
 type MatchStartedMessage = {
-  type: "matchStarted";
+  type: 'matchStarted';
   from: string;
   to: string;
   roomId?: string;
   openMatchId?: string;
   inviteId?: string;
   matchId?: string;
+  wagerAmount?: string;
+  selectedMonsterA?: string;
+  selectedMonsterB?: string;
+  selectedMonsterAName?: string;
+  selectedMonsterBName?: string;
+};
+
+type QueueJoinMessage = {
+  type: 'queueJoin';
+  address: string;
+  monsterId: string;
+  monsterName: string;
+  stage: number;
+  wagerAmount: string;
+};
+
+type QueueLeaveMessage = {
+  type: 'queueLeave';
+  address: string;
 };
 
 type JoinRoomMessage = {
-  type: "joinRoom";
+  type: 'joinRoom';
   address: string;
 };
 
 type LeaveRoomMessage = {
-  type: "leaveRoom";
+  type: 'leaveRoom';
   address: string;
 };
 
+type JoinSpectatorMessage = {
+  type: 'joinSpectator';
+  viewerId: string;
+  address?: string;
+};
+
+type LeaveSpectatorMessage = {
+  type: 'leaveSpectator';
+  viewerId: string;
+};
+
 type RoomSelectMessage = {
-  type: "roomSelect";
+  type: 'roomSelect';
   address: string;
   monsterId?: string;
   monsterName?: string;
@@ -135,25 +108,25 @@ type RoomSelectMessage = {
 };
 
 type RoomStakeMessage = {
-  type: "roomStake";
+  type: 'roomStake';
   address: string;
   stakeSui: string;
 };
 
 type RoomReadyMessage = {
-  type: "roomReady";
+  type: 'roomReady';
   address: string;
   ready: boolean;
 };
 
 type RoomChatMessageEnvelope = {
-  type: "roomChat";
+  type: 'roomChat';
   address: string;
   text: string;
 };
 
 type PingMessage = {
-  type: "ping";
+  type: 'ping';
 };
 
 type ClientMessage =
@@ -163,16 +136,34 @@ type ClientMessage =
   | InviteAcceptedMessage
   | MatchCreatedMessage
   | MatchStartedMessage
+  | QueueJoinMessage
+  | QueueLeaveMessage
   | JoinRoomMessage
   | LeaveRoomMessage
+  | JoinSpectatorMessage
+  | LeaveSpectatorMessage
   | RoomSelectMessage
   | RoomStakeMessage
   | RoomReadyMessage
   | RoomChatMessageEnvelope
   | PingMessage;
 
-type Session = {
+type LobbySession = {
   address?: string;
+};
+
+type RoomSession = {
+  address?: string;
+  viewerId?: string;
+  kind: 'participant' | 'spectator';
+};
+
+type StoredGlobalState = {
+  openMatches: LobbyOpenMatch[];
+  invites: LobbyInvite[];
+  recentMatches: LobbyRecentMatch[];
+  queueEntries: QueueEntry[];
+  battleSummaries: BattleSummary[];
 };
 
 type StoredRoomState = {
@@ -182,12 +173,15 @@ type StoredRoomState = {
   createdAt: number;
 };
 
-const MAX_RECENT_MATCHES = 20;
+const GLOBAL_STATE_KEY = 'globalState';
+const ROOM_STATE_KEY = 'roomState';
+const MAX_RECENT_MATCHES = 24;
 const MAX_INVITES = 200;
-const MAX_ROOM_NOTICES = 18;
-const MAX_ROOM_MESSAGES = 30;
-const ROOM_STATE_KEY = "roomState";
-const ONLINE_WINDOW_MS = 20_000;
+const MAX_ROOM_NOTICES = 24;
+const MAX_ROOM_MESSAGES = 40;
+const MAX_SUMMARIES = 800;
+const MAX_QUEUE = 500;
+const ONLINE_WINDOW_MS = 15_000;
 
 function toJson(data: unknown): string {
   return JSON.stringify(data);
@@ -202,7 +196,7 @@ function safeParseJson(value: string): ClientMessage | null {
 }
 
 function short(address: string): string {
-  if (!address) return "";
+  if (!address) return '';
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
@@ -211,17 +205,46 @@ function nextId(prefix: string): string {
 }
 
 function isAddress(value: unknown): value is string {
-  return typeof value === "string" && /^0x[0-9a-fA-F]{2,}$/.test(value);
+  return typeof value === 'string' && /^0x[0-9a-fA-F]{2,}$/.test(value);
+}
+
+function battleSummaryStatusFromMatchStatus(status: unknown): BattleSummary['status'] {
+  const n = Number(status ?? 0);
+  if (n === 1) return 'locked';
+  if (n === 2) return 'finished';
+  if (n === 3) return 'cancelled';
+  return 'waiting';
+}
+
+function parsePositiveInt(value: string | null, fallback: number): number {
+  const parsed = Number.parseInt(value ?? '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function sortBattleSummaries(kind: BattleListKind, summaries: BattleSummary[]): BattleSummary[] {
+  if (kind === 'highest') {
+    return [...summaries].sort((a, b) => Number(b.wagerAmount) - Number(a.wagerAmount) || b.createdAt - a.createdAt);
+  }
+
+  if (kind === 'newest') {
+    return [...summaries].sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  return [...summaries].sort(
+    (a, b) => b.viewerCount - a.viewerCount || Number(b.wagerAmount) - Number(a.wagerAmount) || b.createdAt - a.createdAt
+  );
 }
 
 export class ArenaLobby {
-  private sessions = new Map<WebSocket, Session>();
+  private sessions = new Map<WebSocket, LobbySession>();
   private players = new Map<string, LobbyPlayer>();
-  private openMatches = new Map<string, OpenMatch>();
+  private openMatches = new Map<string, LobbyOpenMatch>();
   private invites = new Map<string, LobbyInvite>();
-  private recentMatches: RecentMatch[] = [];
+  private recentMatches: LobbyRecentMatch[] = [];
+  private queueEntries = new Map<string, QueueEntry>();
+  private battleSummaries = new Map<string, BattleSummary>();
 
-  private roomSessions = new Map<WebSocket, Session>();
+  private roomSessions = new Map<WebSocket, RoomSession>();
   private roomParticipants = new Map<string, RoomParticipant>();
   private roomNotices: RoomNotice[] = [];
   private roomMessages: RoomChatMessage[] = [];
@@ -229,33 +252,115 @@ export class ArenaLobby {
 
   constructor(private readonly state: DurableObjectState) {
     this.state.blockConcurrencyWhile(async () => {
-      const stored = await this.state.storage.get<StoredRoomState>(ROOM_STATE_KEY);
-      if (!stored) return;
-      this.roomCreatedAt = stored.createdAt || Date.now();
-      this.roomNotices = stored.notices || [];
-      this.roomMessages = stored.messages || [];
-      this.roomParticipants = new Map((stored.participants || []).map((participant) => [participant.address, participant]));
+      const [storedGlobal, storedRoom] = await Promise.all([
+        this.state.storage.get<StoredGlobalState>(GLOBAL_STATE_KEY),
+        this.state.storage.get<StoredRoomState>(ROOM_STATE_KEY),
+      ]);
+
+      if (storedGlobal) {
+        this.openMatches = new Map((storedGlobal.openMatches ?? []).map((item) => [item.id, item]));
+        this.invites = new Map((storedGlobal.invites ?? []).map((item) => [item.id, item]));
+        this.recentMatches = storedGlobal.recentMatches ?? [];
+        this.queueEntries = new Map((storedGlobal.queueEntries ?? []).map((item) => [item.address, item]));
+        this.battleSummaries = new Map((storedGlobal.battleSummaries ?? []).map((item) => [item.matchId, item]));
+      }
+
+      if (storedRoom) {
+        this.roomCreatedAt = storedRoom.createdAt || Date.now();
+        this.roomNotices = storedRoom.notices || [];
+        this.roomMessages = storedRoom.messages || [];
+        this.roomParticipants = new Map((storedRoom.participants || []).map((participant) => [participant.address, participant]));
+      }
     });
   }
 
   async fetch(request: Request): Promise<Response> {
-    if (request.headers.get("Upgrade") !== "websocket") {
-      return new Response("Expected websocket upgrade", { status: 426 });
-    }
-
     const url = new URL(request.url);
-    const pair = new WebSocketPair();
-    const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
 
-    if (url.pathname.startsWith("/room/")) {
-      this.acceptRoomSession(server);
-    } else {
-      this.acceptLobbySession(server);
+    if (request.headers.get('Upgrade') === 'websocket') {
+      const pair = new WebSocketPair();
+      const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
+
+      if (url.pathname.startsWith('/room/') || url.pathname.startsWith('/ws/room/')) {
+        this.acceptRoomSession(server);
+      } else {
+        this.acceptLobbySession(server);
+      }
+
+      return new Response(null, {
+        status: 101,
+        webSocket: client,
+      });
     }
 
-    return new Response(null, {
-      status: 101,
-      webSocket: client,
+    if (url.pathname.startsWith('/api/')) {
+      return this.handleApiRequest(url, request);
+    }
+
+    return new Response('Expected websocket upgrade', { status: 426 });
+  }
+
+  private async handleApiRequest(url: URL, request: Request): Promise<Response> {
+    if (url.pathname === '/api/lobby/snapshot') {
+      this.sweepLobbyPresence();
+      return this.json({
+        onlineCount: [...this.players.values()].filter((player) => Date.now() - player.lastSeen < ONLINE_WINDOW_MS).length,
+        queueCount: this.queueEntries.size,
+      });
+    }
+
+    if (url.pathname === '/api/battles') {
+      const kind = (url.searchParams.get('kind') ?? 'featured') as BattleListKind;
+      const page = parsePositiveInt(url.searchParams.get('page'), 1);
+      const pageSize = parsePositiveInt(url.searchParams.get('pageSize'), 6);
+      const source = [...this.battleSummaries.values()].filter((summary) => summary.status !== 'cancelled');
+      const sorted = sortBattleSummaries(kind, source);
+      const start = (page - 1) * pageSize;
+      return this.json({
+        kind,
+        page,
+        pageSize,
+        total: sorted.length,
+        items: sorted.slice(start, start + pageSize),
+      });
+    }
+
+    if (url.pathname.startsWith('/api/battles/')) {
+      const matchId = url.pathname.replace('/api/battles/', '').trim();
+      if (!matchId) {
+        return this.json({ error: 'Missing match id' }, 400);
+      }
+
+      if (request.method === 'GET') {
+        return this.json({ summary: this.battleSummaries.get(matchId) ?? null });
+      }
+
+      if (request.method === 'POST') {
+        const payload = (await request.json().catch(() => null)) as BattleSummary | { summary?: BattleSummary } | null;
+        const summary = (payload && 'summary' in payload ? payload.summary : payload) as BattleSummary | null;
+        if (!summary?.matchId) {
+          return this.json({ error: 'Missing summary payload' }, 400);
+        }
+        const next = this.upsertBattleSummary(summary);
+        this.persistGlobalState();
+        this.broadcastLobbyState();
+        return this.json({ ok: true, summary: next });
+      }
+    }
+
+    return this.json({ error: 'Not found' }, 404);
+  }
+
+  private json(data: unknown, status = 200): Response {
+    return new Response(JSON.stringify(data), {
+      status,
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'cache-control': 'no-store',
+        'access-control-allow-origin': '*',
+        'access-control-allow-methods': 'GET, POST, OPTIONS',
+        'access-control-allow-headers': 'content-type',
+      },
     });
   }
 
@@ -263,15 +368,15 @@ export class ArenaLobby {
     socket.accept();
     this.sessions.set(socket, {});
 
-    socket.addEventListener("message", (event) => {
+    socket.addEventListener('message', (event) => {
       this.onLobbyMessage(socket, event.data);
     });
 
-    socket.addEventListener("close", () => {
+    socket.addEventListener('close', () => {
       this.onLobbyDisconnect(socket);
     });
 
-    socket.addEventListener("error", () => {
+    socket.addEventListener('error', () => {
       this.onLobbyDisconnect(socket);
     });
 
@@ -280,17 +385,17 @@ export class ArenaLobby {
 
   private acceptRoomSession(socket: WebSocket) {
     socket.accept();
-    this.roomSessions.set(socket, {});
+    this.roomSessions.set(socket, { kind: 'spectator' });
 
-    socket.addEventListener("message", (event) => {
+    socket.addEventListener('message', (event) => {
       this.onRoomMessage(socket, event.data);
     });
 
-    socket.addEventListener("close", () => {
+    socket.addEventListener('close', () => {
       this.onRoomDisconnect(socket);
     });
 
-    socket.addEventListener("error", () => {
+    socket.addEventListener('error', () => {
       this.onRoomDisconnect(socket);
     });
 
@@ -298,76 +403,88 @@ export class ArenaLobby {
   }
 
   private onLobbyMessage(socket: WebSocket, raw: unknown) {
-    if (typeof raw !== "string") return;
+    if (typeof raw !== 'string') return;
 
     const message = safeParseJson(raw);
     if (!message) {
-      this.send(socket, { type: "error", message: "Invalid JSON message" });
+      this.send(socket, { type: 'error', message: 'Invalid JSON message' });
       return;
     }
 
     switch (message.type) {
-      case "join":
+      case 'join':
         this.handleJoin(socket, message);
         return;
-      case "leave":
+      case 'leave':
         this.handleLeave(socket, message);
         return;
-      case "invite":
+      case 'invite':
         this.handleInvite(socket, message);
         return;
-      case "inviteAccepted":
+      case 'inviteAccepted':
         this.handleInviteAccepted(socket, message);
         return;
-      case "matchCreated":
+      case 'matchCreated':
         this.handleMatchCreated(socket, message);
         return;
-      case "matchStarted":
+      case 'matchStarted':
         this.handleMatchStarted(socket, message);
         return;
-      case "ping":
+      case 'queueJoin':
+        this.handleQueueJoin(socket, message);
+        return;
+      case 'queueLeave':
+        this.handleQueueLeave(socket, message);
+        return;
+      case 'ping':
         this.touchLobbySession(socket);
-        this.send(socket, { type: "pong", timestamp: Date.now() });
+        this.send(socket, { type: 'pong', timestamp: Date.now() });
         return;
       default:
-        this.send(socket, { type: "error", message: "Unsupported lobby message type" });
+        this.send(socket, { type: 'error', message: 'Unsupported lobby message type' });
     }
   }
 
   private onRoomMessage(socket: WebSocket, raw: unknown) {
-    if (typeof raw !== "string") return;
+    if (typeof raw !== 'string') return;
 
     const message = safeParseJson(raw);
     if (!message) {
-      this.send(socket, { type: "error", message: "Invalid JSON message" });
+      this.send(socket, { type: 'error', message: 'Invalid JSON message' });
       return;
     }
 
     switch (message.type) {
-      case "joinRoom":
+      case 'joinRoom':
         this.handleJoinRoom(socket, message);
         return;
-      case "leaveRoom":
+      case 'leaveRoom':
         this.handleLeaveRoom(socket, message);
         return;
-      case "roomSelect":
+      case 'joinSpectator':
+        this.handleJoinSpectator(socket, message);
+        return;
+      case 'leaveSpectator':
+        this.handleLeaveSpectator(socket, message);
+        return;
+      case 'roomSelect':
         this.handleRoomSelect(socket, message);
         return;
-      case "roomStake":
+      case 'roomStake':
         this.handleRoomStake(socket, message);
         return;
-      case "roomReady":
+      case 'roomReady':
         this.handleRoomReady(socket, message);
         return;
-      case "roomChat":
+      case 'roomChat':
         this.handleRoomChat(socket, message);
         return;
-      case "ping":
+      case 'ping':
         this.touchRoomSession(socket);
-        this.send(socket, { type: "pong", timestamp: Date.now() });
+        this.send(socket, { type: 'pong', timestamp: Date.now() });
         return;
       default:
-        this.send(socket, { type: "error", message: "Unsupported room message type" });
+        this.send(socket, { type: 'error', message: 'Unsupported room message type' });
     }
   }
 
@@ -375,13 +492,10 @@ export class ArenaLobby {
     const session = this.sessions.get(socket);
     this.sessions.delete(socket);
 
-    if (!session?.address) {
-      return;
-    }
+    if (!session?.address) return;
 
-    const address = session.address;
-    if (!this.hasActiveLobbySessionForAddress(address)) {
-      this.removeAddressState(address);
+    if (!this.hasActiveLobbySessionForAddress(session.address)) {
+      this.removeAddressState(session.address);
     }
 
     this.broadcastLobbyState();
@@ -391,19 +505,16 @@ export class ArenaLobby {
     const session = this.roomSessions.get(socket);
     this.roomSessions.delete(socket);
 
-    if (!session?.address) {
-      return;
-    }
-
-    const address = session.address;
-    if (!this.hasActiveRoomSessionForAddress(address)) {
-      const participant = this.roomParticipants.get(address);
-      if (participant) {
-        participant.present = false;
-        participant.ready = false;
-        participant.lastSeen = Date.now();
-        this.pushRoomNotice(`${short(address)} left the room.`, "warn");
-        this.persistRoomState();
+    if (session?.kind === 'participant' && session.address) {
+      if (!this.hasActiveRoomSessionForAddress(session.address)) {
+        const participant = this.roomParticipants.get(session.address);
+        if (participant) {
+          participant.present = false;
+          participant.ready = false;
+          participant.lastSeen = Date.now();
+          this.pushRoomNotice(`${short(session.address)} left the room.`, 'warn');
+          this.persistRoomState();
+        }
       }
     }
 
@@ -412,25 +523,24 @@ export class ArenaLobby {
 
   private handleJoin(socket: WebSocket, message: JoinMessage) {
     if (!isAddress(message.address)) {
-      this.send(socket, { type: "error", message: "Invalid address in join message" });
+      this.send(socket, { type: 'error', message: 'Invalid address in join message' });
       return;
     }
 
     const now = Date.now();
-    const existing = this.players.get(message.address);
     const session = this.sessions.get(socket) ?? {};
     const previousAddress = session.address;
+    const existing = this.players.get(message.address);
 
     const player: LobbyPlayer = {
       address: message.address,
-      monsterName: message.monsterName || "Unknown",
+      monsterName: message.monsterName || 'Legend',
       level: Number.isFinite(message.level) ? Number(message.level) : 1,
       joinedAt: existing?.joinedAt ?? now,
       lastSeen: now,
     };
 
     this.players.set(message.address, player);
-
     session.address = message.address;
     this.sessions.set(socket, session);
 
@@ -453,9 +563,9 @@ export class ArenaLobby {
 
     this.broadcastLobbyState();
     try {
-      socket.close(1000, "Client left lobby");
+      socket.close(1000, 'Client left lobby');
     } catch {
-      // No-op
+      // no-op
     }
   }
 
@@ -466,7 +576,7 @@ export class ArenaLobby {
 
     const session = this.sessions.get(socket);
     if (session?.address !== message.from) {
-      this.send(socket, { type: "error", message: "Invite sender mismatch" });
+      this.send(socket, { type: 'error', message: 'Invite sender mismatch' });
       return;
     }
 
@@ -477,54 +587,50 @@ export class ArenaLobby {
     }
 
     const invite: LobbyInvite = {
-      id: nextId("invite"),
+      id: nextId('invite'),
       from: message.from,
       to: message.to,
-      roomId: message.roomId || nextId("room"),
+      roomId: message.roomId || nextId('room'),
       monsterName: sender.monsterName,
       level: sender.level,
       createdAt: Date.now(),
-      status: "pending",
+      status: 'pending',
     };
 
     this.invites.set(invite.id, invite);
 
     if (this.invites.size > MAX_INVITES) {
-      const oldestId = [...this.invites.values()].sort((a, b) => a.createdAt - b.createdAt)[0]?.id;
-      if (oldestId) this.invites.delete(oldestId);
+      const oldest = [...this.invites.values()].sort((a, b) => a.createdAt - b.createdAt)[0];
+      if (oldest) this.invites.delete(oldest.id);
     }
 
-    this.sendToAddress(message.to, { type: "invite", invite });
-    this.sendToAddress(message.from, { type: "invite", invite });
+    this.persistGlobalState();
+    this.sendToAddress(message.to, { type: 'invite', invite });
+    this.sendToAddress(message.from, { type: 'invite', invite });
     this.broadcastLobbyState();
   }
 
   private handleInviteAccepted(socket: WebSocket, message: InviteAcceptedMessage) {
-    if (!isAddress(message.from) || !isAddress(message.to)) {
-      return;
-    }
+    if (!isAddress(message.from) || !isAddress(message.to)) return;
 
     const session = this.sessions.get(socket);
     if (session?.address !== message.to) {
-      this.send(socket, { type: "error", message: "Invite accept sender mismatch" });
+      this.send(socket, { type: 'error', message: 'Invite accept sender mismatch' });
       return;
     }
 
     const invite = this.invites.get(message.inviteId);
-    if (!invite) {
-      return;
-    }
-
+    if (!invite) return;
     if (invite.from !== message.from || invite.to !== message.to) {
-      this.send(socket, { type: "error", message: "Invite accept payload mismatch" });
+      this.send(socket, { type: 'error', message: 'Invite accept payload mismatch' });
       return;
     }
 
-    invite.status = "accepted";
+    invite.status = 'accepted';
     this.invites.delete(message.inviteId);
 
     const accepted = {
-      id: nextId("invite_accept"),
+      id: nextId('invite_accept'),
       inviteId: message.inviteId,
       from: message.from,
       to: message.to,
@@ -533,68 +639,63 @@ export class ArenaLobby {
     };
 
     this.pushRecent(`${short(message.to)} accepted ${short(message.from)}'s invite.`);
-    this.sendToAddress(message.from, { type: "inviteAccepted", accepted });
-    this.sendToAddress(message.to, { type: "inviteAccepted", accepted });
+    this.persistGlobalState();
+    this.sendToAddress(message.from, { type: 'inviteAccepted', accepted });
+    this.sendToAddress(message.to, { type: 'inviteAccepted', accepted });
     this.broadcastLobbyState();
   }
 
   private handleMatchCreated(socket: WebSocket, message: MatchCreatedMessage) {
-    if (!isAddress(message.creator)) {
-      return;
-    }
+    if (!isAddress(message.creator)) return;
 
     const session = this.sessions.get(socket);
     if (session?.address !== message.creator) {
-      this.send(socket, { type: "error", message: "Creator mismatch" });
+      this.send(socket, { type: 'error', message: 'Creator mismatch' });
       return;
     }
 
     const creator = this.players.get(message.creator);
-    if (!creator) {
-      return;
-    }
+    if (!creator) return;
 
-    const isOpenMatch = !message.opponent;
-
-    if (isOpenMatch) {
-      const openMatch: OpenMatch = {
-        id: message.matchId || nextId("match"),
+    if (!message.opponent) {
+      const openMatch: LobbyOpenMatch = {
+        id: message.matchId || nextId('match'),
         creator: message.creator,
         creatorMonster: message.monsterName || creator.monsterName,
         creatorLevel: Number.isFinite(message.level) ? Number(message.level) : creator.level,
-        stakeSui: String(message.stakeSui ?? "0"),
+        stakeSui: String(message.stakeSui ?? '0'),
         createdAt: Date.now(),
       };
       this.openMatches.set(openMatch.id, openMatch);
-      this.pushRecent(`${short(message.creator)} opened a lobby match (${openMatch.stakeSui} SUI stake)`);
-    } else {
-      if (isAddress(message.opponent) && message.matchId) {
-        const started: StartedMatch = {
-          id: nextId("started"),
-          from: message.creator,
-          to: message.opponent,
-          roomId: message.matchId,
-          matchId: message.matchId,
-          startedAt: Date.now(),
-        };
-        this.sendToAddress(started.from, { type: "matchStarted", match: started });
-        this.sendToAddress(started.to, { type: "matchStarted", match: started });
-      }
-      this.pushRecent(`On-chain match created: ${short(message.creator)} vs ${short(message.opponent || "")}`);
+      this.pushRecent(`${short(message.creator)} opened a battle room (${openMatch.stakeSui} SUI)`);
+      this.persistGlobalState();
+      this.broadcastLobbyState();
+      return;
     }
 
-    this.broadcastLobbyState();
+    if (isAddress(message.opponent) && message.matchId) {
+      this.upsertBattleSummary({
+        matchId: message.matchId,
+        playerA: message.creator,
+        playerB: message.opponent,
+        status: 'waiting',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        viewerCount: 0,
+        wagerAmount: String(message.stakeSui ?? '0'),
+      });
+      this.persistGlobalState();
+      this.broadcastLobbyState();
+    }
   }
 
   private handleMatchStarted(socket: WebSocket, message: MatchStartedMessage) {
-    if (!isAddress(message.from) || !isAddress(message.to)) {
-      return;
-    }
+    if (!isAddress(message.from) || !isAddress(message.to)) return;
 
     const session = this.sessions.get(socket);
     const sender = session?.address;
     if (!sender || (sender !== message.from && sender !== message.to)) {
-      this.send(socket, { type: "error", message: "Match start sender mismatch" });
+      this.send(socket, { type: 'error', message: 'Match start sender mismatch' });
       return;
     }
 
@@ -603,42 +704,148 @@ export class ArenaLobby {
     }
 
     if (message.inviteId) {
-      const invite = this.invites.get(message.inviteId);
-      if (invite) {
-        invite.status = "accepted";
-        this.invites.delete(message.inviteId);
-      }
+      this.invites.delete(message.inviteId);
     }
 
-    const started: StartedMatch = {
-      id: nextId("started"),
+    const started = {
+      id: nextId('started'),
       from: message.from,
       to: message.to,
-      roomId: message.roomId,
+      roomId: message.matchId || message.roomId,
       openMatchId: message.openMatchId,
       inviteId: message.inviteId,
       matchId: message.matchId,
       startedAt: Date.now(),
     };
 
-    this.pushRecent(`Lobby duel ready: ${short(started.from)} vs ${short(started.to)}`);
+    if (message.matchId) {
+      this.upsertBattleSummary({
+        matchId: message.matchId,
+        playerA: message.from,
+        playerB: message.to,
+        status: 'waiting',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        viewerCount: this.battleSummaries.get(message.matchId)?.viewerCount ?? 0,
+        wagerAmount: String(message.wagerAmount ?? this.battleSummaries.get(message.matchId)?.wagerAmount ?? '0'),
+        selectedMonsterA: message.selectedMonsterA,
+        selectedMonsterB: message.selectedMonsterB,
+        selectedMonsterAName: message.selectedMonsterAName,
+        selectedMonsterBName: message.selectedMonsterBName,
+      });
+    }
 
-    this.sendToAddress(started.from, { type: "matchStarted", match: started });
-    this.sendToAddress(started.to, { type: "matchStarted", match: started });
+    this.pushRecent(`Arena ready: ${short(message.from)} vs ${short(message.to)}`);
+    this.persistGlobalState();
+    this.sendToAddress(message.from, { type: 'matchStarted', match: started });
+    this.sendToAddress(message.to, { type: 'matchStarted', match: started });
     this.broadcastLobbyState();
+  }
+
+  private handleQueueJoin(socket: WebSocket, message: QueueJoinMessage) {
+    if (!isAddress(message.address)) return;
+
+    const session = this.sessions.get(socket);
+    if (session?.address !== message.address) {
+      this.send(socket, { type: 'error', message: 'Queue sender mismatch' });
+      return;
+    }
+
+    this.queueEntries.set(message.address, {
+      address: message.address,
+      monsterId: message.monsterId,
+      monsterName: message.monsterName,
+      stage: Number.isFinite(message.stage) ? Number(message.stage) : 0,
+      wagerAmount: String(message.wagerAmount ?? '0'),
+      joinedAt: this.queueEntries.get(message.address)?.joinedAt ?? Date.now(),
+      lastSeen: Date.now(),
+    });
+
+    if (this.queueEntries.size > MAX_QUEUE) {
+      const oldest = [...this.queueEntries.values()].sort((a, b) => a.joinedAt - b.joinedAt)[0];
+      if (oldest) this.queueEntries.delete(oldest.address);
+    }
+
+    this.persistGlobalState();
+    this.tryMatchmakeQueue();
+    this.broadcastLobbyState();
+  }
+
+  private handleQueueLeave(socket: WebSocket, message: QueueLeaveMessage) {
+    const session = this.sessions.get(socket);
+    const address = session?.address ?? message.address;
+    if (!address) return;
+
+    this.queueEntries.delete(address);
+    this.persistGlobalState();
+    this.broadcastLobbyState();
+  }
+
+  private tryMatchmakeQueue() {
+    const entries = [...this.queueEntries.values()]
+      .filter((entry) => this.players.has(entry.address))
+      .sort((a, b) => a.joinedAt - b.joinedAt);
+
+    const matched = new Set<string>();
+
+    for (let index = 0; index < entries.length; index += 1) {
+      const first = entries[index];
+      if (matched.has(first.address)) continue;
+
+      const second = entries.find(
+        (candidate, candidateIndex) =>
+          candidateIndex > index &&
+          !matched.has(candidate.address) &&
+          candidate.address !== first.address &&
+          candidate.wagerAmount === first.wagerAmount
+      );
+
+      if (!second) continue;
+
+      matched.add(first.address);
+      matched.add(second.address);
+      this.queueEntries.delete(first.address);
+      this.queueEntries.delete(second.address);
+
+      const queueMatch: QueueMatch = {
+        id: nextId('queue_match'),
+        creator: first.address,
+        playerA: first.address,
+        playerB: second.address,
+        monsterAId: first.monsterId,
+        monsterAName: first.monsterName,
+        monsterAStage: first.stage,
+        monsterBId: second.monsterId,
+        monsterBName: second.monsterName,
+        monsterBStage: second.stage,
+        wagerAmount: first.wagerAmount,
+        createdAt: Date.now(),
+      };
+
+      this.pushRecent(`Queue match found: ${short(first.address)} vs ${short(second.address)}`);
+      this.sendToAddress(first.address, { type: 'queueMatched', match: queueMatch });
+      this.sendToAddress(second.address, { type: 'queueMatched', match: queueMatch });
+    }
+
+    if (matched.size > 0) {
+      this.persistGlobalState();
+    }
   }
 
   private handleJoinRoom(socket: WebSocket, message: JoinRoomMessage) {
     if (!isAddress(message.address)) {
-      this.send(socket, { type: "error", message: "Invalid address in room join" });
+      this.send(socket, { type: 'error', message: 'Invalid address in room join' });
       return;
     }
 
     const now = Date.now();
-    const session = this.roomSessions.get(socket) ?? {};
-    const previousAddress = session.address;
-    const existing = this.roomParticipants.get(message.address);
+    const session = this.roomSessions.get(socket) ?? { kind: 'participant' as const };
+    session.address = message.address;
+    session.kind = 'participant';
+    delete session.viewerId;
+    this.roomSessions.set(socket, session);
 
+    const existing = this.roomParticipants.get(message.address);
     this.roomParticipants.set(message.address, {
       address: message.address,
       joinedAt: existing?.joinedAt ?? now,
@@ -648,21 +855,10 @@ export class ArenaLobby {
       monsterName: existing?.monsterName,
       stage: existing?.stage,
       stakeSui: existing?.stakeSui,
-      ready: existing?.ready ?? false,
+      ready: false,
     });
 
-    session.address = message.address;
-    this.roomSessions.set(socket, session);
-
-    if (previousAddress && previousAddress !== message.address && !this.hasActiveRoomSessionForAddress(previousAddress)) {
-      const previous = this.roomParticipants.get(previousAddress);
-      if (previous) {
-        previous.present = false;
-        previous.ready = false;
-      }
-    }
-
-    this.pushRoomNotice(`${short(message.address)} entered the room.`, "info");
+    this.pushRoomNotice(`${short(message.address)} entered the room.`, 'info');
     this.persistRoomState();
     this.broadcastRoomState();
   }
@@ -673,7 +869,6 @@ export class ArenaLobby {
     if (!address) return;
 
     this.roomSessions.delete(socket);
-
     if (!this.hasActiveRoomSessionForAddress(address)) {
       const participant = this.roomParticipants.get(address);
       if (participant) {
@@ -681,15 +876,34 @@ export class ArenaLobby {
         participant.ready = false;
         participant.lastSeen = Date.now();
       }
-      this.pushRoomNotice(`${short(address)} left the room.`, "warn");
+      this.pushRoomNotice(`${short(address)} left the room.`, 'warn');
       this.persistRoomState();
     }
 
     this.broadcastRoomState();
     try {
-      socket.close(1000, "Client left room");
+      socket.close(1000, 'Client left room');
     } catch {
-      // No-op
+      // no-op
+    }
+  }
+
+  private handleJoinSpectator(socket: WebSocket, message: JoinSpectatorMessage) {
+    const session = this.roomSessions.get(socket) ?? { kind: 'spectator' as const };
+    session.kind = 'spectator';
+    session.viewerId = String(message.viewerId || nextId('viewer'));
+    session.address = isAddress(message.address) ? message.address : undefined;
+    this.roomSessions.set(socket, session);
+    this.broadcastRoomState();
+  }
+
+  private handleLeaveSpectator(socket: WebSocket, _message: LeaveSpectatorMessage) {
+    this.roomSessions.delete(socket);
+    this.broadcastRoomState();
+    try {
+      socket.close(1000, 'Spectator left');
+    } catch {
+      // no-op
     }
   }
 
@@ -703,6 +917,7 @@ export class ArenaLobby {
     participant.monsterName = message.monsterName;
     participant.stage = Number.isFinite(message.stage) ? Number(message.stage) : participant.stage;
     participant.lastSeen = Date.now();
+    participant.present = true;
 
     this.persistRoomState();
     this.broadcastRoomState();
@@ -714,8 +929,9 @@ export class ArenaLobby {
     if (session?.address !== message.address) return;
 
     const participant = this.ensureRoomParticipant(message.address);
-    participant.stakeSui = String(message.stakeSui ?? "0");
+    participant.stakeSui = String(message.stakeSui ?? '0');
     participant.lastSeen = Date.now();
+    participant.present = true;
 
     this.persistRoomState();
     this.broadcastRoomState();
@@ -729,11 +945,7 @@ export class ArenaLobby {
     const participant = this.ensureRoomParticipant(message.address);
     participant.ready = Boolean(message.ready);
     participant.lastSeen = Date.now();
-
-    this.pushRoomNotice(
-      participant.ready ? `${short(message.address)} is ready.` : `${short(message.address)} is not ready.`,
-      participant.ready ? "success" : "info"
-    );
+    participant.present = true;
 
     this.persistRoomState();
     this.broadcastRoomState();
@@ -748,7 +960,7 @@ export class ArenaLobby {
     participant.lastSeen = Date.now();
     participant.present = true;
 
-    const text = String(message.text ?? "").trim().replace(/\s+/g, " ");
+    const text = String(message.text ?? '').trim().replace(/\s+/g, ' ');
     if (!text) return;
 
     this.pushRoomMessage(message.address, text.slice(0, 280));
@@ -775,21 +987,28 @@ export class ArenaLobby {
     const session = this.sessions.get(socket);
     if (!session?.address) return;
 
+    const now = Date.now();
     const player = this.players.get(session.address);
-    if (!player) return;
+    if (player) {
+      player.lastSeen = now;
+    }
 
-    player.lastSeen = Date.now();
+    const queued = this.queueEntries.get(session.address);
+    if (queued) {
+      queued.lastSeen = now;
+    }
   }
 
   private touchRoomSession(socket: WebSocket) {
     const session = this.roomSessions.get(socket);
-    if (!session?.address) return;
+    if (!session) return;
 
-    const participant = this.roomParticipants.get(session.address);
-    if (!participant) return;
-
-    participant.lastSeen = Date.now();
-    participant.present = true;
+    if (session.kind === 'participant' && session.address) {
+      const participant = this.roomParticipants.get(session.address);
+      if (!participant) return;
+      participant.lastSeen = Date.now();
+      participant.present = true;
+    }
   }
 
   private sweepLobbyPresence(now = Date.now()) {
@@ -797,6 +1016,12 @@ export class ArenaLobby {
       if (now - player.lastSeen < ONLINE_WINDOW_MS) continue;
       if (this.hasActiveLobbySessionForAddress(address)) continue;
       this.removeAddressState(address);
+    }
+
+    for (const [address, entry] of this.queueEntries) {
+      if (now - entry.lastSeen < ONLINE_WINDOW_MS) continue;
+      if (this.hasActiveLobbySessionForAddress(address)) continue;
+      this.queueEntries.delete(address);
     }
   }
 
@@ -820,8 +1045,8 @@ export class ArenaLobby {
   }
 
   private pushRecent(summary: string) {
-    const item: RecentMatch = {
-      id: nextId("recent"),
+    const item: LobbyRecentMatch = {
+      id: nextId('recent'),
       summary,
       timestamp: Date.now(),
     };
@@ -831,9 +1056,9 @@ export class ArenaLobby {
     }
   }
 
-  private pushRoomNotice(summary: string, tone: RoomNotice["tone"]) {
+  private pushRoomNotice(summary: string, tone: RoomNotice['tone']) {
     const item: RoomNotice = {
-      id: nextId("room_notice"),
+      id: nextId('room_notice'),
       summary,
       timestamp: Date.now(),
       tone,
@@ -846,7 +1071,7 @@ export class ArenaLobby {
 
   private pushRoomMessage(address: string, text: string) {
     const item: RoomChatMessage = {
-      id: nextId("room_chat"),
+      id: nextId('room_chat'),
       address,
       text,
       timestamp: Date.now(),
@@ -855,6 +1080,33 @@ export class ArenaLobby {
     if (this.roomMessages.length > MAX_ROOM_MESSAGES) {
       this.roomMessages.length = MAX_ROOM_MESSAGES;
     }
+  }
+
+  private upsertBattleSummary(input: BattleSummary): BattleSummary {
+    const existing = this.battleSummaries.get(input.matchId);
+    const next: BattleSummary = {
+      ...existing,
+      ...input,
+      createdAt: existing?.createdAt ?? input.createdAt ?? Date.now(),
+      updatedAt: Date.now(),
+      viewerCount: Number.isFinite(input.viewerCount) ? Number(input.viewerCount) : existing?.viewerCount ?? 0,
+      wagerAmount: String(input.wagerAmount ?? existing?.wagerAmount ?? '0'),
+      status: input.status ?? existing?.status ?? 'waiting',
+      playerA: input.playerA ?? existing?.playerA ?? '',
+      playerB: input.playerB ?? existing?.playerB ?? '',
+    };
+
+    this.battleSummaries.set(next.matchId, next);
+
+    const overflow = this.battleSummaries.size - MAX_SUMMARIES;
+    if (overflow > 0) {
+      const oldest = [...this.battleSummaries.values()].sort((a, b) => a.createdAt - b.createdAt).slice(0, overflow);
+      for (const item of oldest) {
+        this.battleSummaries.delete(item.matchId);
+      }
+    }
+
+    return next;
   }
 
   private broadcastLobbyState() {
@@ -878,27 +1130,38 @@ export class ArenaLobby {
 
     const invites = address
       ? [...this.invites.values()].filter(
-          (invite) => invite.status === "pending" && (invite.from === address || invite.to === address)
+          (invite) => invite.status === 'pending' && (invite.from === address || invite.to === address)
         )
       : [];
 
     this.send(socket, {
-      type: "lobbyState",
+      type: 'lobbyState',
       players: [...this.players.values()]
         .filter((player) => Date.now() - player.lastSeen < ONLINE_WINDOW_MS)
         .sort((a, b) => b.lastSeen - a.lastSeen),
       openMatches: [...this.openMatches.values()].sort((a, b) => b.createdAt - a.createdAt),
       recentMatches: this.recentMatches,
       invites,
+      queueCount: this.queueEntries.size,
       timestamp: Date.now(),
     });
+  }
+
+  private roomViewerCount(): number {
+    let count = 0;
+    for (const session of this.roomSessions.values()) {
+      if (session.kind === 'spectator') {
+        count += 1;
+      }
+    }
+    return count;
   }
 
   private sendRoomState(socket: WebSocket) {
     this.sweepRoomPresence();
     const participants = [...this.roomParticipants.values()].sort((a, b) => a.joinedAt - b.joinedAt);
     this.send(socket, {
-      type: "roomState",
+      type: 'roomState',
       room: {
         createdAt: this.roomCreatedAt,
         updatedAt: Date.now(),
@@ -906,6 +1169,7 @@ export class ArenaLobby {
         notices: this.roomNotices,
         messages: this.roomMessages,
         roomReady: participants.filter((participant) => participant.ready).length >= 2,
+        viewerCount: this.roomViewerCount(),
       },
     });
   }
@@ -936,13 +1200,14 @@ export class ArenaLobby {
 
   private hasActiveRoomSessionForAddress(address: string): boolean {
     for (const session of this.roomSessions.values()) {
-      if (session.address === address) return true;
+      if (session.kind === 'participant' && session.address === address) return true;
     }
     return false;
   }
 
   private removeAddressState(address: string) {
     this.players.delete(address);
+    this.queueEntries.delete(address);
 
     for (const [matchId, match] of this.openMatches) {
       if (match.creator === address) {
@@ -955,6 +1220,18 @@ export class ArenaLobby {
         this.invites.delete(inviteId);
       }
     }
+
+    this.persistGlobalState();
+  }
+
+  private persistGlobalState() {
+    void this.state.storage.put(GLOBAL_STATE_KEY, {
+      openMatches: [...this.openMatches.values()],
+      invites: [...this.invites.values()],
+      recentMatches: this.recentMatches,
+      queueEntries: [...this.queueEntries.values()],
+      battleSummaries: [...this.battleSummaries.values()],
+    } satisfies StoredGlobalState);
   }
 
   private persistRoomState() {
@@ -965,4 +1242,33 @@ export class ArenaLobby {
       createdAt: this.roomCreatedAt,
     } satisfies StoredRoomState);
   }
+}
+
+export function toBattleSummaryFromChain(input: {
+  matchId: string;
+  playerA: string;
+  playerB: string;
+  matchStatus: number;
+  createdAt?: number;
+  viewerCount?: number;
+  wagerAmount?: string;
+  selectedMonsterA?: string | null;
+  selectedMonsterB?: string | null;
+  selectedMonsterAName?: string | null;
+  selectedMonsterBName?: string | null;
+}): BattleSummary {
+  return {
+    matchId: input.matchId,
+    playerA: input.playerA,
+    playerB: input.playerB,
+    status: battleSummaryStatusFromMatchStatus(input.matchStatus),
+    createdAt: input.createdAt ?? Date.now(),
+    updatedAt: Date.now(),
+    viewerCount: input.viewerCount ?? 0,
+    wagerAmount: input.wagerAmount ?? '0',
+    selectedMonsterA: input.selectedMonsterA,
+    selectedMonsterB: input.selectedMonsterB,
+    selectedMonsterAName: input.selectedMonsterAName,
+    selectedMonsterBName: input.selectedMonsterBName,
+  };
 }

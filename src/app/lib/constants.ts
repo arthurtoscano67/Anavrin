@@ -22,9 +22,9 @@ export const STAGE_META: Record<number, { label: string; color: string; emoji: s
 
 export const ROUTES = [
   { path: "/", label: "Mint" },
-  { path: "/legends", label: "My Legends" },
-  { path: "/arena", label: "Arena" },
-  { path: "/breed", label: "Breed" },
+  { path: "/my-monsters", label: "My Monsters" },
+  { path: "/lobby", label: "Lobby" },
+  { path: "/queue", label: "Queue" },
   { path: "/market", label: "Marketplace" },
   { path: "/leaderboard", label: "Leaderboard" },
   { path: "/admin", label: "Admin" },

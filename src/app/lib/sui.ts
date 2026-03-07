@@ -285,6 +285,15 @@ export async function fetchArenaMatch(client: SuiClient, matchId: string): Promi
   };
 }
 
+export function extractCreatedArenaMatchId(block: {
+  objectChanges?: Array<{ type?: string; objectType?: string; objectId?: string }> | null;
+}): string | null {
+  const created = block.objectChanges?.find(
+    (change) => change.type === "created" && change.objectType === ARENA_MATCH_TYPE && typeof change.objectId === "string"
+  );
+  return created?.objectId ?? null;
+}
+
 export async function fetchAllArenaMatches(client: SuiClient): Promise<ArenaMatch[]> {
   const events = await queryAllEvents(client, `${PACKAGE_ID}::${MODULE}::MatchCreated`);
   const ids = [...new Set(

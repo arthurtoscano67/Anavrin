@@ -6,9 +6,13 @@ export default defineConfig({
   base: '/',
   server: {
     proxy: {
-      '/lobby': {
+      '/ws': {
         target: 'http://127.0.0.1:8787',
         ws: true,
+        changeOrigin: true,
+      },
+      '/api': {
+        target: 'http://127.0.0.1:8787',
         changeOrigin: true,
       },
     },

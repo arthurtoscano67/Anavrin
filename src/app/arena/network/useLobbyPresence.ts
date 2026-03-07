@@ -8,6 +8,7 @@ import type {
   LobbyOpenMatch,
   LobbyPlayer,
   LobbyRecentMatch,
+  QueueMatch,
   StartedMatch,
 } from './types';
 
@@ -24,9 +25,11 @@ type LobbyEnvelope = {
   openMatches?: LobbyOpenMatch[];
   invites?: LobbyInvite[];
   recentMatches?: LobbyRecentMatch[];
+  queueCount?: number;
   invite?: LobbyInvite;
   match?: StartedMatch;
   accepted?: InviteAccepted;
+  queueMatch?: QueueMatch;
   message?: string;
 };
 
@@ -39,13 +42,15 @@ export function useLobbyPresence({ enabled, address, monsterName = 'Legend', lev
   const [openMatches, setOpenMatches] = useState<LobbyOpenMatch[]>([]);
   const [invites, setInvites] = useState<LobbyInvite[]>([]);
   const [recentMatches, setRecentMatches] = useState<LobbyRecentMatch[]>([]);
+  const [queueCount, setQueueCount] = useState(0);
+  const [queueMatch, setQueueMatch] = useState<QueueMatch | null>(null);
   const [startedMatch, setStartedMatch] = useState<StartedMatch | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const closedRef = useRef(false);
   const reconnectTimerRef = useRef<number | null>(null);
   const pingTimerRef = useRef<number | null>(null);
-  const endpoint = useMemo(() => buildArenaSocketUrl('/lobby'), []);
+  const endpoint = useMemo(() => buildArenaSocketUrl('/ws/lobby'), []);
 
   const send = useCallback((payload: Record<string, unknown>) => {
     const socket = socketRef.current;
@@ -107,6 +112,7 @@ export function useLobbyPresence({ enabled, address, monsterName = 'Legend', lev
             setOpenMatches(payload.openMatches ?? []);
             setInvites(payload.invites ?? []);
             setRecentMatches(payload.recentMatches ?? []);
+            setQueueCount(payload.queueCount ?? 0);
             return;
           }
           if (payload.type === 'invite' && payload.invite) {
@@ -118,6 +124,10 @@ export function useLobbyPresence({ enabled, address, monsterName = 'Legend', lev
           }
           if (payload.type === 'matchStarted' && payload.match) {
             setStartedMatch(payload.match);
+            return;
+          }
+          if (payload.type === 'queueMatched' && payload.queueMatch) {
+            setQueueMatch(payload.queueMatch);
             return;
           }
           if (payload.type === 'inviteAccepted' && payload.accepted) {
@@ -199,14 +209,43 @@ export function useLobbyPresence({ enabled, address, monsterName = 'Legend', lev
   );
 
   const announceMatchStarted = useCallback(
-    (input: { from: string; to: string; roomId?: string; openMatchId?: string; inviteId?: string; matchId?: string }) => {
+    (input: {
+      from: string;
+      to: string;
+      roomId?: string;
+      openMatchId?: string;
+      inviteId?: string;
+      matchId?: string;
+      wagerAmount?: string;
+      selectedMonsterA?: string;
+      selectedMonsterB?: string;
+      selectedMonsterAName?: string;
+      selectedMonsterBName?: string;
+    }) => {
       send({ type: 'matchStarted', ...input });
     },
     [send]
   );
 
+  const joinQueue = useCallback(
+    (input: { monsterId: string; monsterName: string; stage: number; wagerAmount: string }) => {
+      if (!address) return;
+      send({ type: 'queueJoin', address, ...input });
+    },
+    [address, send]
+  );
+
+  const leaveQueue = useCallback(() => {
+    if (!address) return;
+    send({ type: 'queueLeave', address });
+  }, [address, send]);
+
   const clearStartedMatch = useCallback(() => {
     setStartedMatch(null);
+  }, []);
+
+  const clearQueueMatch = useCallback(() => {
+    setQueueMatch(null);
   }, []);
 
   return {
@@ -217,12 +256,17 @@ export function useLobbyPresence({ enabled, address, monsterName = 'Legend', lev
     openMatches,
     invites,
     recentMatches,
+    queueCount,
+    queueMatch,
     startedMatch,
     lastError,
     invitePlayer,
     acceptInvite,
     postOpenMatch,
     announceMatchStarted,
+    joinQueue,
+    leaveQueue,
     clearStartedMatch,
+    clearQueueMatch,
   };
 }

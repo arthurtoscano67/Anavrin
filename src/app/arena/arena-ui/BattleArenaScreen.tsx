@@ -14,6 +14,7 @@ export function BattleArenaScreen({
   pending,
   accountAddress,
   spectator,
+  viewerCount,
   onAttack,
   onSpecial,
   onDefend,
@@ -30,6 +31,7 @@ export function BattleArenaScreen({
   pending: string | null;
   accountAddress?: string;
   spectator: boolean;
+  viewerCount?: number;
   onAttack: () => void;
   onSpecial: () => void;
   onDefend: () => void;
@@ -93,6 +95,7 @@ export function BattleArenaScreen({
           <span className="poke-chip">{toSui(totalStake)} SUI</span>
           <span className="poke-chip">{statusLabel(match.status)}</span>
           {spectator && <span className="poke-chip poke-chip-cyan">Spectator</span>}
+          <span className="poke-chip">{viewerCount ?? 0} watching</span>
         </div>
         <div className="flex gap-1">
           <button className="poke-chip hover:bg-white/15" onClick={onBackRoom}>Room</button>

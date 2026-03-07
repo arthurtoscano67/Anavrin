@@ -667,6 +667,7 @@ export function ArenaExperience() {
           pending={pending}
           accountAddress={account.address}
           spectator={!activeMatch || (activeMatch.player_a !== account.address && activeMatch.player_b !== account.address)}
+          viewerCount={room.viewerCount}
           onAttack={resolveBattle}
           onSpecial={resolveBattle}
           onDefend={handleDefend}

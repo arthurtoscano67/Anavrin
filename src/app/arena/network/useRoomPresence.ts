@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { buildArenaSocketUrl } from './socket';
-import type { LobbyConnectionState, RoomParticipant, RoomState, RoomNotice, RoomChatMessage } from './types';
+import type { LobbyConnectionState, RoomChatMessage, RoomNotice, RoomParticipant, RoomState } from './types';
 
 type UseRoomPresenceOptions = {
   enabled: boolean;
   roomId?: string;
   address?: string;
+  spectator?: boolean;
 };
 
 type RoomEnvelope = {
@@ -17,19 +18,39 @@ type RoomEnvelope = {
 
 const RECONNECT_MS = 1800;
 const PING_MS = 5_000;
+const VIEWER_STORAGE_KEY = 'anavrinArenaViewerId';
 
-export function useRoomPresence({ enabled, roomId, address }: UseRoomPresenceOptions) {
+function ensureViewerId(): string {
+  if (typeof window === 'undefined') {
+    return `viewer_${crypto.randomUUID()}`;
+  }
+
+  const existing = window.localStorage.getItem(VIEWER_STORAGE_KEY);
+  if (existing) return existing;
+
+  const created = `viewer_${crypto.randomUUID()}`;
+  window.localStorage.setItem(VIEWER_STORAGE_KEY, created);
+  return created;
+}
+
+export function useRoomPresence({ enabled, roomId, address, spectator = false }: UseRoomPresenceOptions) {
   const [connectionState, setConnectionState] = useState<LobbyConnectionState>('closed');
   const [participants, setParticipants] = useState<RoomParticipant[]>([]);
   const [notices, setNotices] = useState<RoomNotice[]>([]);
   const [messages, setMessages] = useState<RoomChatMessage[]>([]);
   const [roomReady, setRoomReady] = useState(false);
+  const [viewerCount, setViewerCount] = useState(0);
   const [lastError, setLastError] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const closedRef = useRef(false);
   const reconnectTimerRef = useRef<number | null>(null);
   const pingTimerRef = useRef<number | null>(null);
-  const endpoint = useMemo(() => (roomId ? buildArenaSocketUrl(`/room/${roomId}`) : ''), [roomId]);
+  const viewerIdRef = useRef('');
+  const endpoint = useMemo(() => (roomId ? buildArenaSocketUrl(`/ws/room/${roomId}`) : ''), [roomId]);
+
+  if (!viewerIdRef.current) {
+    viewerIdRef.current = ensureViewerId();
+  }
 
   const send = useCallback((payload: Record<string, unknown>) => {
     const socket = socketRef.current;
@@ -50,7 +71,7 @@ export function useRoomPresence({ enabled, roomId, address }: UseRoomPresenceOpt
   }, []);
 
   useEffect(() => {
-    if (!enabled || !roomId || !address) {
+    if (!enabled || !roomId || (!address && !spectator)) {
       cleanupTimers();
       socketRef.current?.close();
       socketRef.current = null;
@@ -59,6 +80,7 @@ export function useRoomPresence({ enabled, roomId, address }: UseRoomPresenceOpt
       setNotices([]);
       setMessages([]);
       setRoomReady(false);
+      setViewerCount(0);
       return;
     }
 
@@ -72,7 +94,11 @@ export function useRoomPresence({ enabled, roomId, address }: UseRoomPresenceOpt
       socket.addEventListener('open', () => {
         setConnectionState('open');
         setLastError(null);
-        socket.send(JSON.stringify({ type: 'joinRoom', address }));
+        if (spectator || !address) {
+          socket.send(JSON.stringify({ type: 'joinSpectator', viewerId: viewerIdRef.current, address }));
+        } else {
+          socket.send(JSON.stringify({ type: 'joinRoom', address }));
+        }
         pingTimerRef.current = window.setInterval(() => {
           if (socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({ type: 'ping' }));
@@ -88,6 +114,7 @@ export function useRoomPresence({ enabled, roomId, address }: UseRoomPresenceOpt
             setNotices(payload.room.notices ?? []);
             setMessages(payload.room.messages ?? []);
             setRoomReady(Boolean(payload.room.roomReady));
+            setViewerCount(payload.room.viewerCount ?? 0);
             return;
           }
           if (payload.type === 'error') {
@@ -121,42 +148,46 @@ export function useRoomPresence({ enabled, roomId, address }: UseRoomPresenceOpt
     return () => {
       closedRef.current = true;
       cleanupTimers();
-      send({ type: 'leaveRoom', address });
+      if (spectator || !address) {
+        send({ type: 'leaveSpectator', viewerId: viewerIdRef.current });
+      } else {
+        send({ type: 'leaveRoom', address });
+      }
       socketRef.current?.close();
       socketRef.current = null;
     };
-  }, [address, cleanupTimers, enabled, endpoint, roomId, send]);
+  }, [address, cleanupTimers, enabled, endpoint, roomId, send, spectator]);
 
   const setSelection = useCallback(
     (input: { monsterId?: string; monsterName?: string; stage?: number }) => {
-      if (!address) return;
+      if (!address || spectator) return;
       send({ type: 'roomSelect', address, ...input });
     },
-    [address, send]
+    [address, send, spectator]
   );
 
   const setStake = useCallback(
     (stakeSui: string) => {
-      if (!address) return;
+      if (!address || spectator) return;
       send({ type: 'roomStake', address, stakeSui });
     },
-    [address, send]
+    [address, send, spectator]
   );
 
   const setReady = useCallback(
     (ready: boolean) => {
-      if (!address) return;
+      if (!address || spectator) return;
       send({ type: 'roomReady', address, ready });
     },
-    [address, send]
+    [address, send, spectator]
   );
 
   const sendChat = useCallback(
     (text: string) => {
-      if (!address) return false;
+      if (!address || spectator) return false;
       return send({ type: 'roomChat', address, text });
     },
-    [address, send]
+    [address, send, spectator]
   );
 
   return {
@@ -167,6 +198,7 @@ export function useRoomPresence({ enabled, roomId, address }: UseRoomPresenceOpt
     notices,
     messages,
     roomReady,
+    viewerCount,
     lastError,
     setSelection,
     setStake,

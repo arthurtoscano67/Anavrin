@@ -17,6 +17,31 @@ export type LobbyOpenMatch = {
   createdAt: number;
 };
 
+export type QueueEntry = {
+  address: string;
+  monsterId: string;
+  monsterName: string;
+  stage: number;
+  wagerAmount: string;
+  joinedAt: number;
+  lastSeen: number;
+};
+
+export type QueueMatch = {
+  id: string;
+  creator: string;
+  playerA: string;
+  playerB: string;
+  monsterAId: string;
+  monsterAName: string;
+  monsterAStage: number;
+  monsterBId: string;
+  monsterBName: string;
+  monsterBStage: number;
+  wagerAmount: string;
+  createdAt: number;
+};
+
 export type LobbyInvite = {
   id: string;
   from: string;
@@ -32,6 +57,33 @@ export type LobbyRecentMatch = {
   id: string;
   summary: string;
   timestamp: number;
+};
+
+export type BattleSummaryStatus = "waiting" | "locked" | "finished" | "cancelled";
+
+export type BattleSummary = {
+  matchId: string;
+  playerA: string;
+  playerB: string;
+  status: BattleSummaryStatus;
+  createdAt: number;
+  updatedAt: number;
+  viewerCount: number;
+  wagerAmount: string;
+  selectedMonsterA?: string | null;
+  selectedMonsterB?: string | null;
+  selectedMonsterAName?: string | null;
+  selectedMonsterBName?: string | null;
+};
+
+export type BattleListKind = "featured" | "highest" | "newest";
+
+export type BattleListResponse = {
+  items: BattleSummary[];
+  kind: BattleListKind;
+  page: number;
+  pageSize: number;
+  total: number;
 };
 
 export type StartedMatch = {
@@ -87,4 +139,5 @@ export type RoomState = {
   notices: RoomNotice[];
   messages: RoomChatMessage[];
   roomReady: boolean;
+  viewerCount: number;
 };
