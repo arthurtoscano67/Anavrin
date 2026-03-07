@@ -8,7 +8,7 @@ interface MonsterCardProps {
 }
 
 export function MonsterCard({ monster, footer }: MonsterCardProps) {
-  const imageUrl = `${RENDERER_BASE}/nft/${monster.objectId}.svg`;
+  const imageUrl = `${RENDERER_BASE}/martian/${monster.objectId}.svg`;
 
   return (
     <article className="overflow-hidden rounded-xl border border-white/10 bg-storm/70 shadow-card">

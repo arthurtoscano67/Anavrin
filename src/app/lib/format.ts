@@ -17,11 +17,11 @@ export function short(addr?: string | null): string {
 }
 
 export function monsterSvg(objectId: string): string {
-  return `${RENDERER}/nft/${objectId}.svg`;
+  return `${RENDERER}/martian/${objectId}.svg`;
 }
 
 export function monsterPng(objectId: string): string {
-  return `${RENDERER}/nft/${objectId}.png`;
+  return `${RENDERER}/martian/${objectId}.svg`;
 }
 
 export function stageMeta(stage: number) {

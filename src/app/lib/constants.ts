@@ -5,7 +5,7 @@ export const ADMIN_CAP_ID = "0xd2a2f18520a50574300227dca665af955cc2704a14496a45a
 export const DISPLAY_ID = "0x213450da8ef24ee08e857f1f308a3d27623d7316ac4c795e389851cdf0199c43";
 export const CLOCK_ID = "0x6";
 export const MODULE = "martian";
-export const RENDERER = "https://heart-beat-production.up.railway.app";
+export const RENDERER = "https://martians-renderer-production.up.railway.app";
 export const SUI_NETWORK = "mainnet";
 export const SUI_DECIMALS = 1_000_000_000;
 

@@ -46,4 +46,4 @@ export const EQUIPMENT_SLOTS = [
 
 export const RENDERER_BASE =
   process.env.NEXT_PUBLIC_RENDERER_BASE ||
-  "https://heart-beat-production.up.railway.app";
+  "https://martians-renderer-production.up.railway.app";

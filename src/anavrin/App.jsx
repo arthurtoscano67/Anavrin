@@ -12,7 +12,7 @@ const PACKAGE_ID = "0x51abc7016876cd23efcd5a5240bc03ef0e3ed4538e0d87a029944d45cb
 const TREASURY_ID = "0x414bd328952f9ddfde568e0a256476a0e2e148b21b606892f07ea3dd4360baeb";
 const CLOCK_ID = "0x6";
 const DISPLAY_ID = "0xda8656ee556049f5c96579340240a7da76654d02daf4b49808d00c6432dd72d8";
-const RENDERER_BASE = "https://heart-beat-production.up.railway.app";
+const RENDERER_BASE = "https://martians-renderer-production.up.railway.app";
 const SUI_DECIMALS = 1_000_000_000;
 
 const STAGES = [
@@ -81,7 +81,7 @@ function parseError(e) {
 
 function NftImage({ id }) {
   const [loaded, setLoaded] = useState(false);
-  const src = `${RENDERER_BASE}/nft/${id}.svg`;
+  const src = `${RENDERER_BASE}/martian/${id}.svg`;
 
   useEffect(() => {
     setLoaded(false);
