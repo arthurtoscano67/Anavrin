@@ -169,7 +169,7 @@ export function ArenaExperience() {
 
     if (urlMatch && activeMatch?.objectId !== urlMatch) {
       arena.setCurrentMatchId(urlMatch);
-      void loadMatch(urlMatch, 'battle');
+      void loadMatch(urlMatch, 'room');
       return;
     }
   }, [activeMatch?.objectId, arena, arenaMatches.persistMatchId, loadMatch, params]);
@@ -209,12 +209,8 @@ export function ArenaExperience() {
     if (!arena.currentMatchId || !activeMatch || !isRoomMessageRelevant(activeMatch, account?.address)) return;
     if (activeMatch.status === 2 || resolution) {
       arena.setScreen('battle');
-      return;
     }
-    if (room.roomReady && activeMatch.status === 1) {
-      arena.setScreen('battle');
-    }
-  }, [account?.address, activeMatch, arena, resolution, room.roomReady]);
+  }, [account?.address, activeMatch, arena, resolution]);
 
   const roomModel = useMemo(
     () => buildRoomModel({
@@ -423,8 +419,9 @@ export function ArenaExperience() {
   }, [resetToLobby]);
 
   const handleOpenBattle = useCallback(() => {
+    if (!roomModel.canStartBattle && !resolution) return;
     arena.setScreen('battle');
-  }, [arena]);
+  }, [arena, resolution, roomModel.canStartBattle]);
 
   const liveMatches = useMemo(
     () => arenaMatches.activeMatches.filter((match) => match.objectId !== arena.currentMatchId).slice(0, 6),
