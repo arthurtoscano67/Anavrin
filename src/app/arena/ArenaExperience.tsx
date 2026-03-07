@@ -442,9 +442,17 @@ export function ArenaExperience() {
   }, [arena.currentMatchId, execute, loadMatch, roomSetReady, walletMonsters]);
 
   const handleToggleReady = useCallback(() => {
+    if (!roomIsConnected) {
+      toast.error('Room link is reconnecting. Try READY again in a second.');
+      return;
+    }
+    if (!roomModel.canReady && !roomModel.playerReady) {
+      toast.error('Both legends must be deposited before READY unlocks.');
+      return;
+    }
     const you = room.participants.find((participant) => participant.address === account?.address);
     roomSetReady(!you?.ready);
-  }, [account?.address, room.participants, roomSetReady]);
+  }, [account?.address, room.participants, roomIsConnected, roomModel.canReady, roomModel.playerReady, roomSetReady]);
 
   const playFrames = useCallback(async () => {
     if (!battlePreview) return;
@@ -592,6 +600,9 @@ export function ArenaExperience() {
           match={activeMatch}
           currentMatchId={arena.currentMatchId}
           currentRoomId={arena.currentRoomId}
+          roomConnectionState={room.connectionState}
+          roomIsConnected={roomIsConnected}
+          roomLastError={room.lastError}
           resolution={resolution}
           roomParticipants={room.participants}
           roomNotices={room.notices}

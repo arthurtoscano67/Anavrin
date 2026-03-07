@@ -8,6 +8,8 @@ export type RoomModel = {
   playerSide: 'a' | 'b' | null;
   playerAReady: boolean;
   playerBReady: boolean;
+  playerReady: boolean;
+  opponentReady: boolean;
   bothDeposited: boolean;
   bothReady: boolean;
   playerDeposited: boolean;
@@ -164,6 +166,8 @@ export function buildRoomModel(input: {
   const bothDeposited = Boolean(sideAHasMonster && sideBHasMonster);
   const playerAReady = Boolean(match?.player_a && participants.find((participant) => participant.address === match.player_a)?.ready);
   const playerBReady = Boolean(match?.player_b && participants.find((participant) => participant.address === match.player_b)?.ready);
+  const playerReady = Boolean(playerSide && (playerSide === 'a' ? playerAReady : playerBReady));
+  const opponentReady = Boolean(playerSide && (playerSide === 'a' ? playerBReady : playerAReady));
   const bothReady = Boolean(bothDeposited && playerAReady && playerBReady);
   const canDeposit = Boolean(match && playerSide && match.status === 0 && !playerDeposited);
   const canWithdraw = Boolean(match && playerSide && match.status === 0 && playerDeposited);
@@ -220,6 +224,8 @@ export function buildRoomModel(input: {
     playerSide,
     playerAReady,
     playerBReady,
+    playerReady,
+    opponentReady,
     bothDeposited,
     bothReady,
     playerDeposited,
