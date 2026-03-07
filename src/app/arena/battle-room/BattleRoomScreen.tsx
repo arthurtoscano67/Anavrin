@@ -1,6 +1,6 @@
 import { StageBadge } from '../../components/StageBadge';
 import { MonsterImage } from '../../components/MonsterImage';
-import { short } from '../../lib/format';
+import { short, toSui } from '../../lib/format';
 import type { ArenaMatch, MatchResolution, Monster } from '../../lib/types';
 import type { LobbyConnectionState, RoomNotice, RoomParticipant } from '../network/types';
 import type { RoomModel } from '../battle-engine/battleEngine';
@@ -12,6 +12,18 @@ type VisualMonster = Partial<Monster> & {
   objectId?: string;
   name?: string;
   stage?: number;
+};
+
+type GuideState = {
+  eyebrow: string;
+  title: string;
+  body: string;
+  primaryLabel: string;
+  primaryAction?: () => void;
+  primaryDisabled: boolean;
+  primaryTone: string;
+  statusLabel: string;
+  statusTone: string;
 };
 
 export function BattleRoomScreen({
@@ -38,7 +50,6 @@ export function BattleRoomScreen({
   onCreateRoomMatch,
   onDeposit,
   onWithdraw,
-  onToggleReady,
   onBattle,
   onBackLobby,
 }: {
@@ -65,30 +76,22 @@ export function BattleRoomScreen({
   onCreateRoomMatch: () => void;
   onDeposit: () => void;
   onWithdraw: () => void;
-  onToggleReady: () => void;
   onBattle: () => void;
   onBackLobby: () => void;
 }) {
-  const playerA = match?.player_a;
-  const playerB = match?.player_b;
+  const playerAAddress = match?.player_a ?? roomParticipants[0]?.address;
+  const playerBAddress = match?.player_b ?? roomParticipants.find((participant) => participant.address !== playerAAddress)?.address;
   const roomLeader = roomParticipants.find((participant) => participant.address !== accountAddress);
-  const playerAAddress = playerA ?? roomParticipants[0]?.address;
-  const playerBAddress = playerB ?? roomParticipants.find((participant) => participant.address !== playerAAddress)?.address;
-  const youArePlayerA = Boolean(accountAddress && playerAAddress === accountAddress);
-  const youArePlayerB = Boolean(accountAddress && playerBAddress === accountAddress);
-  const waitingForMatch = Boolean(currentRoomId && !currentMatchId);
-  const roomCanOpen = waitingForMatch && canCreateRoomMatch;
   const sideAHasMonster = Boolean(match?.mon_a || match?.monster_a_data);
   const sideBHasMonster = Boolean(match?.mon_b || match?.monster_b_data);
-  const sideAStateLabel = roomModel.playerAReady ? 'Ready' : sideAHasMonster ? 'Deposited' : playerAAddress ? 'Waiting' : 'Open';
-  const sideBStateLabel = roomModel.playerBReady ? 'Ready' : sideBHasMonster ? 'Deposited' : playerBAddress ? 'Waiting' : 'Open';
-  const showBattleButton = roomModel.bothReady && Boolean(currentMatchId);
+  const waitingForMatch = Boolean(currentRoomId && !currentMatchId);
+  const roomCanOpen = waitingForMatch && canCreateRoomMatch;
   const actionDisabled = pending !== null;
-  const withdrawLocked = Boolean(match?.status === 1 || match?.status === 2 || match?.status === 3);
-  const playerReady = roomModel.playerReady;
-  const opponentReady = roomModel.opponentReady;
   const selectedMonster = monsters.find((monster) => monster.objectId === selectedMonsterId) ?? null;
   const selectionLocked = roomModel.playerDeposited || actionDisabled;
+  const withdrawLocked = Boolean(match?.status === 1 || match?.status === 2 || match?.status === 3);
+  const totalStakeSui = match ? toSui((BigInt(match.stake_a || '0') + BigInt(match.stake_b || '0')).toString()) : '0.0000';
+
   const connectionLabel = roomConnectionState === 'open'
     ? 'Room Live'
     : roomConnectionState === 'connecting'
@@ -97,33 +100,46 @@ export function BattleRoomScreen({
         ? 'Room Offline'
         : 'Room Closed';
 
-  const flowStep = showBattleButton
-    ? 4
-    : roomModel.bothDeposited || playerReady || opponentReady
-      ? 3
-      : currentMatchId
-        ? 2
-        : 1;
+  const flowStep = roomModel.canStartBattle
+    ? 3
+    : roomModel.playerDeposited || roomModel.opponentDeposited
+      ? 2
+      : currentMatchId || waitingForMatch
+        ? 1
+        : 0;
 
   const flowSteps = [
-    { id: 1, label: 'Invite' },
+    { id: 1, label: 'Room' },
     { id: 2, label: 'Deposit' },
-    { id: 3, label: 'Ready' },
-    { id: 4, label: 'Battle' },
+    { id: 3, label: 'Battle' },
   ];
 
-  const guide = (() => {
+  const guide: GuideState = (() => {
     if (resolution) {
       return {
-        eyebrow: 'Battle complete',
-        title: 'Legends sent home.',
-        body: 'The fight is done. Your monsters have been updated on-chain and returned to their wallets.',
+        eyebrow: 'Complete',
+        title: 'Battle finished.',
+        body: 'The fight resolved on-chain and the legends are back in their wallets.',
         primaryLabel: 'Back To Lobby',
-        primaryTone: 'from-purple to-cyan',
-        primaryDisabled: actionDisabled,
         primaryAction: onBackLobby,
+        primaryDisabled: actionDisabled,
+        primaryTone: 'from-purple to-cyan',
         statusLabel: 'Complete',
         statusTone: 'border-yellow-300/30 bg-yellow-500/10 text-yellow-100',
+      };
+    }
+
+    if (match?.status === 3) {
+      return {
+        eyebrow: 'Cancelled',
+        title: 'Room cancelled.',
+        body: 'The contract cancelled this room. Legends should already be back with their trainers.',
+        primaryLabel: 'Back To Lobby',
+        primaryAction: onBackLobby,
+        primaryDisabled: actionDisabled,
+        primaryTone: 'from-slate-700 to-slate-600',
+        statusLabel: 'Cancelled',
+        statusTone: 'border-red-300/25 bg-red-500/10 text-red-100',
       };
     }
 
@@ -131,12 +147,12 @@ export function BattleRoomScreen({
       if (roomCanOpen) {
         return {
           eyebrow: 'Step 1',
-          title: 'Open the battle room.',
-          body: 'Both trainers are here. Tap once to create the shared battle pool on-chain.',
+          title: 'Open the battle pool.',
+          body: 'Both trainers are here. Tap once to create the on-chain ArenaMatch object.',
           primaryLabel: pending === 'create-room' ? 'Opening...' : 'Open Battle Room',
-          primaryTone: 'from-cyan to-sky-400',
-          primaryDisabled: actionDisabled,
           primaryAction: onCreateRoomMatch,
+          primaryDisabled: actionDisabled,
+          primaryTone: 'from-cyan to-sky-400',
           statusLabel: 'Both Here',
           statusTone: 'border-cyan/30 bg-cyan/10 text-cyan-50',
         };
@@ -145,11 +161,10 @@ export function BattleRoomScreen({
       return {
         eyebrow: 'Step 1',
         title: 'Waiting for invite accept.',
-        body: 'Your room is ready. The next thing that happens is the other trainer taps ACCEPT.',
+        body: 'This room is live already. The next move is the other trainer accepting the invite.',
         primaryLabel: 'Waiting for Trainer',
-        primaryTone: 'from-slate-700 to-slate-600',
         primaryDisabled: true,
-        primaryAction: undefined,
+        primaryTone: 'from-slate-700 to-slate-600',
         statusLabel: 'Invite Sent',
         statusTone: 'border-cyan/30 bg-cyan/10 text-cyan-50',
       };
@@ -158,14 +173,14 @@ export function BattleRoomScreen({
     if (!roomModel.playerDeposited) {
       return {
         eyebrow: 'Step 2',
-        title: 'Deposit your legend.',
+        title: selectedMonster ? 'Deposit your legend.' : 'Pick your legend first.',
         body: selectedMonster
-          ? `${selectedMonster.name} is selected. Deposit it now${selectedStake !== '0' ? ` with ${selectedStake} SUI` : ''}.`
-          : 'Pick a legend below, then deposit it into the battle pool.',
+          ? `${selectedMonster.name} is selected. Deposit now${selectedStake !== '0' ? ` with ${selectedStake} SUI` : ''}.`
+          : 'Choose a legend below, then deposit it into the battle pool.',
         primaryLabel: pending === 'deposit' ? 'Depositing...' : 'Deposit Legend',
-        primaryTone: 'from-cyan to-purple',
-        primaryDisabled: actionDisabled || !roomModel.canDeposit,
         primaryAction: onDeposit,
+        primaryDisabled: actionDisabled || !roomModel.canDeposit,
+        primaryTone: 'from-cyan to-purple',
         statusLabel: roomModel.canDeposit ? 'Your Turn' : 'Pick Legend',
         statusTone: roomModel.canDeposit ? 'border-cyan/30 bg-cyan/10 text-cyan-50' : 'border-white/10 bg-white/5 text-gray-200',
       };
@@ -176,57 +191,39 @@ export function BattleRoomScreen({
         eyebrow: 'Step 2',
         title: 'Waiting for opponent deposit.',
         body: roomModel.canWithdraw
-          ? 'Your legend is safe in the pool. You can still withdraw for safety until the other trainer deposits.'
-          : 'Your legend is safe in the pool. Waiting for the other trainer to load theirs.',
+          ? 'Your legend is in the pool. Withdraw is still available for safety until the other trainer deposits.'
+          : 'Your legend is in the pool. Waiting for the other trainer to deposit theirs.',
         primaryLabel: 'Waiting for Opponent',
+        primaryDisabled: true,
         primaryTone: 'from-slate-700 to-slate-600',
-        primaryDisabled: true,
-        primaryAction: undefined,
-        statusLabel: 'Legend Deposited',
+        statusLabel: 'Deposited',
         statusTone: 'border-green-300/30 bg-green-500/10 text-green-100',
       };
     }
 
-    if (!playerReady) {
+    if (roomModel.canStartBattle) {
       return {
         eyebrow: 'Step 3',
-        title: roomIsConnected ? 'Tap READY.' : 'Reconnecting room link.',
-        body: roomIsConnected
-          ? 'Both legends are in. One tap marks you ready and lights up battle once the other trainer is ready too.'
-          : roomLastError ?? 'The room is reconnecting. READY unlocks as soon as the room link is live again.',
-        primaryLabel: roomIsConnected ? 'Ready Up' : 'Reconnecting...',
-        primaryTone: roomIsConnected ? 'from-green-400 to-emerald-500' : 'from-slate-700 to-slate-600',
-        primaryDisabled: actionDisabled || !roomModel.canReady || !roomIsConnected,
-        primaryAction: onToggleReady,
-        statusLabel: roomIsConnected ? 'Ready Needed' : connectionLabel,
-        statusTone: roomIsConnected ? 'border-green-300/30 bg-green-500/10 text-green-100' : 'border-red-300/25 bg-red-500/10 text-red-100',
-      };
-    }
-
-    if (!opponentReady) {
-      return {
-        eyebrow: 'Step 3',
-        title: 'You are ready.',
-        body: 'Stay here. As soon as the other trainer taps READY, the battle button will light up automatically.',
-        primaryLabel: 'Waiting for Ready',
-        primaryTone: 'from-green-400 to-emerald-500',
-        primaryDisabled: true,
-        primaryAction: undefined,
-        statusLabel: 'Ready!',
-        statusTone: 'border-green-300/30 bg-green-500/10 text-green-100',
+        title: 'Battle now.',
+        body: 'Both legends are deposited and the match is locked. Either trainer can start the battle.',
+        primaryLabel: pending === 'battle' ? 'Battling...' : 'Battle Now',
+        primaryAction: onBattle,
+        primaryDisabled: actionDisabled,
+        primaryTone: 'from-fuchsia-400 via-pink-400 to-orange-300',
+        statusLabel: 'Go Time',
+        statusTone: 'border-fuchsia-300/35 bg-fuchsia-500/15 text-fuchsia-50',
       };
     }
 
     return {
-      eyebrow: 'Step 4',
-      title: 'Battle now.',
-      body: 'Both trainers are ready. Tap once to resolve the fight on-chain and send both legends back home.',
-      primaryLabel: pending === 'battle' ? 'Battling...' : 'Battle Now',
-      primaryTone: 'from-fuchsia-400 via-pink-400 to-orange-300',
-      primaryDisabled: actionDisabled || !showBattleButton,
-      primaryAction: onBattle,
-      statusLabel: 'Go Time',
-      statusTone: 'border-fuchsia-300/35 bg-fuchsia-500/15 text-fuchsia-50',
+      eyebrow: 'Syncing',
+      title: 'Updating battle state.',
+      body: roomLastError ?? 'The room is syncing with the chain. Wait for the battle button to unlock.',
+      primaryLabel: 'Syncing...',
+      primaryDisabled: true,
+      primaryTone: 'from-slate-700 to-slate-600',
+      statusLabel: roomIsConnected ? 'Syncing' : connectionLabel,
+      statusTone: roomIsConnected ? 'border-yellow-300/25 bg-yellow-500/10 text-yellow-100' : 'border-red-300/25 bg-red-500/10 text-red-100',
     };
   })();
 
@@ -245,18 +242,12 @@ export function BattleRoomScreen({
         <div className="flex flex-wrap gap-2 text-xs font-semibold text-gray-300">
           {currentRoomId ? <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Room {short(currentRoomId)}</span> : null}
           {currentMatchId ? <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Battle ID {short(currentMatchId)}</span> : null}
-          {resolution ? <span className="rounded-full border border-yellow-300/30 bg-yellow-500/10 px-3 py-1 text-yellow-100">Finished</span> : null}
+          {match ? <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Stake {totalStakeSui} SUI</span> : null}
           {roomLeader ? <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">Opponent {short(roomLeader.address)}</span> : null}
           <span className={`rounded-full border px-3 py-1 ${roomIsConnected ? 'border-cyan/30 bg-cyan/10 text-cyan-50' : roomConnectionState === 'connecting' ? 'border-yellow-300/25 bg-yellow-500/10 text-yellow-100' : 'border-red-300/25 bg-red-500/10 text-red-100'}`}>
             {connectionLabel}
           </span>
         </div>
-
-        {waitingForMatch ? (
-          <div className="rounded-[22px] border border-cyan/30 bg-cyan/10 p-4 text-sm text-cyan-50">
-            Invite sent. This room is live already. When the other trainer accepts, the battle vault opens and deposit becomes available.
-          </div>
-        ) : null}
       </section>
 
       <section className="glass-card space-y-4 p-5 sm:p-6">
@@ -270,7 +261,7 @@ export function BattleRoomScreen({
           </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-3">
           {flowSteps.map((step) => {
             const active = flowStep === step.id;
             const done = flowStep > step.id;
@@ -300,21 +291,6 @@ export function BattleRoomScreen({
         </div>
       </section>
 
-      {showBattleButton ? (
-        <section className="glass-card rounded-[28px] border border-fuchsia-300/30 bg-gradient-to-r from-fuchsia-500/15 to-pink-500/10 p-4 sm:p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-fuchsia-100">Battle Ready</div>
-              <div className="mt-2 text-2xl font-black text-white">Both legends are ready to fight.</div>
-              <div className="mt-1 text-sm text-fuchsia-50/85">Stay in this room and tap the battle button below.</div>
-            </div>
-            <div className="rounded-full border border-fuchsia-200/35 bg-fuchsia-500/15 px-4 py-2 text-sm font-black uppercase tracking-[0.16em] text-fuchsia-50">
-              LIVE
-            </div>
-          </div>
-        </section>
-      ) : null}
-
       <section className="arena-stage overflow-hidden rounded-[32px] border border-borderSoft p-4 sm:p-6">
         <div className="relative z-10 grid gap-4 lg:grid-cols-[1fr_120px_1fr] lg:items-center">
           <ArenaMonsterPanel
@@ -323,7 +299,7 @@ export function BattleRoomScreen({
             monster={playerAMonster}
             ready={sideAHasMonster}
             side="left"
-            stateLabel={sideAStateLabel}
+            stateLabel={sideAHasMonster ? 'Deposited' : playerAAddress ? 'Waiting' : 'Open'}
           />
 
           <div className="grid place-items-center">
@@ -336,7 +312,7 @@ export function BattleRoomScreen({
             monster={playerBMonster}
             ready={sideBHasMonster}
             side="right"
-            stateLabel={sideBStateLabel}
+            stateLabel={sideBHasMonster ? 'Deposited' : playerBAddress ? 'Waiting' : 'Open'}
           />
         </div>
 
@@ -344,17 +320,17 @@ export function BattleRoomScreen({
           {[
             {
               title: 'Player A',
-              isYou: youArePlayerA,
+              isYou: Boolean(accountAddress && playerAAddress === accountAddress),
               deposited: sideAHasMonster,
-              ready: roomModel.playerAReady,
               canWithdrawNow: Boolean(sideAHasMonster && match?.status === 0),
+              stakeLabel: `${toSui(match?.stake_a ?? '0')} SUI`,
             },
             {
               title: 'Player B',
-              isYou: youArePlayerB,
+              isYou: Boolean(accountAddress && playerBAddress === accountAddress),
               deposited: sideBHasMonster,
-              ready: roomModel.playerBReady,
               canWithdrawNow: Boolean(sideBHasMonster && match?.status === 0),
+              stakeLabel: `${toSui(match?.stake_b ?? '0')} SUI`,
             },
           ].map((side) => (
             <div key={side.title} className="rounded-[22px] border border-white/10 bg-black/25 p-4">
@@ -366,8 +342,8 @@ export function BattleRoomScreen({
                 <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.14em] ${side.deposited ? 'border-green-300/35 bg-green-500/15 text-green-100' : 'border-white/10 bg-white/5 text-gray-300'}`}>
                   {side.deposited ? 'Deposited' : 'Waiting'}
                 </span>
-                <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.14em] ${side.ready ? 'border-green-300/35 bg-green-500/15 text-green-100' : 'border-white/10 bg-white/5 text-gray-300'}`}>
-                  {side.ready ? 'Ready' : 'Not Ready'}
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-gray-200">
+                  Stake {side.stakeLabel}
                 </span>
                 <span className={`rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.14em] ${side.canWithdrawNow ? 'border-red-300/35 bg-red-500/15 text-red-100' : 'border-white/10 bg-white/5 text-gray-300'}`}>
                   {side.canWithdrawNow ? 'Can Withdraw' : withdrawLocked && side.deposited ? 'Locked In' : 'Safe'}
@@ -469,7 +445,7 @@ export function BattleRoomScreen({
             </button>
             <button
               className={`min-h-[76px] rounded-[24px] px-5 text-lg font-black uppercase tracking-[0.16em] text-white disabled:opacity-50 ${
-                showBattleButton
+                roomModel.canStartBattle
                   ? `arena-ready-glow arena-battle-shake bg-gradient-to-r ${guide.primaryTone}`
                   : guide.primaryDisabled
                     ? 'border border-borderSoft bg-black/20 text-gray-300'
@@ -483,16 +459,16 @@ export function BattleRoomScreen({
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <div className="rounded-[18px] border border-white/10 bg-white/5 px-4 py-3 text-center text-xs font-black uppercase tracking-[0.14em] text-gray-200">
-              You: {roomModel.playerDeposited ? (playerReady ? 'Ready' : 'Deposited') : 'Picking'}
+              You: {roomModel.playerDeposited ? 'Deposited' : 'Picking'}
             </div>
             <div className="rounded-[18px] border border-white/10 bg-white/5 px-4 py-3 text-center text-xs font-black uppercase tracking-[0.14em] text-gray-200">
-              Opponent: {roomModel.opponentDeposited ? (opponentReady ? 'Ready' : 'Deposited') : 'Waiting'}
+              Opponent: {roomModel.opponentDeposited ? 'Deposited' : 'Waiting'}
             </div>
             <div className={`rounded-[18px] border px-4 py-3 text-center text-xs font-black uppercase tracking-[0.14em] ${roomModel.canWithdraw ? 'border-red-300/35 bg-red-500/15 text-red-100' : 'border-white/10 bg-white/5 text-gray-300'}`}>
               {roomModel.canWithdraw ? 'Safety Exit Open' : 'Safety Exit Closed'}
             </div>
-            <div className={`rounded-[18px] border px-4 py-3 text-center text-xs font-black uppercase tracking-[0.14em] ${showBattleButton ? 'border-fuchsia-300/35 bg-fuchsia-500/15 text-fuchsia-50' : 'border-white/10 bg-white/5 text-gray-300'}`}>
-              {showBattleButton ? 'Battle Lit Up' : roomModel.canReady ? 'Ready Window' : flowStep === 1 ? 'Invite Step' : 'Loading'}
+            <div className={`rounded-[18px] border px-4 py-3 text-center text-xs font-black uppercase tracking-[0.14em] ${roomModel.canStartBattle ? 'border-fuchsia-300/35 bg-fuchsia-500/15 text-fuchsia-50' : 'border-white/10 bg-white/5 text-gray-300'}`}>
+              {roomModel.canStartBattle ? 'Battle Live' : flowStep === 0 ? 'Choose Room' : flowStep === 1 ? 'Open Room' : flowStep === 2 ? 'Deposit Step' : 'Syncing'}
             </div>
           </div>
         </div>

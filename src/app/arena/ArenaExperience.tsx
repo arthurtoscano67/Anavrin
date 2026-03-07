@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
 import { useSearchParams } from 'react-router-dom';
@@ -54,6 +54,8 @@ export function ArenaExperience() {
   const [frameIndex, setFrameIndex] = useState(0);
   const [animatingBattle, setAnimatingBattle] = useState(false);
   const [roomOpponentAddress, setRoomOpponentAddress] = useState(params.get('opponent') ?? '');
+  const attemptedInitialRestoreRef = useRef(false);
+  const [recoveringFromChain, setRecoveringFromChain] = useState(false);
 
   const monsters = walletMonsters.data ?? [];
   const selectedMonster = useMemo(
@@ -91,7 +93,6 @@ export function ArenaExperience() {
   const roomIsConnected = room.isConnected;
   const roomSetSelection = room.setSelection;
   const roomSetStake = room.setStake;
-  const roomSetReady = room.setReady;
 
   const resetToLobby = useCallback(() => {
     setActiveMatch(null);
@@ -188,6 +189,10 @@ export function ArenaExperience() {
   }, [arena, client]);
 
   useEffect(() => {
+    attemptedInitialRestoreRef.current = false;
+  }, [account?.address]);
+
+  useEffect(() => {
     const urlMonster = params.get('monster');
     if (urlMonster) setSelectedMonsterId(urlMonster);
     const urlRoom = params.get('room');
@@ -237,6 +242,46 @@ export function ArenaExperience() {
   ]);
 
   useEffect(() => {
+    if (!account?.address) return;
+    if (attemptedInitialRestoreRef.current) return;
+
+    const urlMatch = params.get('match');
+    const urlRoom = params.get('room');
+    if (urlMatch || urlRoom) {
+      attemptedInitialRestoreRef.current = true;
+      return;
+    }
+
+    if (arena.currentMatchId || arena.currentRoomId) {
+      attemptedInitialRestoreRef.current = true;
+      return;
+    }
+
+    if (arenaMatches.isLoading || arenaMatches.isFetching) return;
+
+    attemptedInitialRestoreRef.current = true;
+    const restoredMatch = arenaMatches.restoredOwnedMatch;
+    if (!restoredMatch || (restoredMatch.status !== 0 && restoredMatch.status !== 1)) {
+      return;
+    }
+
+    setRecoveringFromChain(true);
+    setRoomOpponentAddress(restoredMatch.player_a === account.address ? restoredMatch.player_b : restoredMatch.player_a);
+    void loadMatch(restoredMatch.objectId, 'room').finally(() => {
+      setRecoveringFromChain(false);
+    });
+  }, [
+    account?.address,
+    arena.currentMatchId,
+    arena.currentRoomId,
+    arenaMatches.isFetching,
+    arenaMatches.isLoading,
+    arenaMatches.restoredOwnedMatch,
+    loadMatch,
+    params,
+  ]);
+
+  useEffect(() => {
     if (!arena.currentMatchId || activeMatch?.objectId === arena.currentMatchId) return;
     void loadMatch(arena.currentMatchId, arena.screen === 'battle' ? 'battle' : 'room');
   }, [activeMatch?.objectId, arena.currentMatchId, arena.screen, loadMatch]);
@@ -249,16 +294,10 @@ export function ArenaExperience() {
 
     const intervalId = window.setInterval(() => {
       void refreshMatchState(arena.currentMatchId);
-    }, 3_500);
+    }, 3_000);
 
     return () => window.clearInterval(intervalId);
   }, [arena.currentMatchId, pending, refreshMatchState]);
-
-  useEffect(() => {
-    if (arena.currentRoomId) return;
-    if (!arena.currentMatchId) return;
-    arena.persistRoomId(arena.currentMatchId);
-  }, [arena.currentMatchId, arena.currentRoomId, arena.persistRoomId]);
 
   useEffect(() => {
     if (!lobbyStartedMatch?.matchId) return;
@@ -415,13 +454,12 @@ export function ArenaExperience() {
       }
 
       await execute(tx, 'Legend deposited');
-      roomSetReady(false);
       await walletMonsters.refetch();
       await loadMatch(arena.currentMatchId, 'room');
     } finally {
       setPending(null);
     }
-  }, [account?.address, arena.currentMatchId, execute, loadMatch, roomSetReady, selectedMonster, selectedStake, walletMonsters]);
+  }, [account?.address, arena.currentMatchId, execute, loadMatch, selectedMonster, selectedStake, walletMonsters]);
 
   const handleWithdraw = useCallback(async () => {
     if (!arena.currentMatchId) return;
@@ -433,26 +471,12 @@ export function ArenaExperience() {
         arguments: [tx.object(arena.currentMatchId)],
       });
       await execute(tx, 'Legend returned');
-      roomSetReady(false);
       await walletMonsters.refetch();
       await loadMatch(arena.currentMatchId, 'room');
     } finally {
       setPending(null);
     }
-  }, [arena.currentMatchId, execute, loadMatch, roomSetReady, walletMonsters]);
-
-  const handleToggleReady = useCallback(() => {
-    if (!roomIsConnected) {
-      toast.error('Room link is reconnecting. Try READY again in a second.');
-      return;
-    }
-    if (!roomModel.canReady && !roomModel.playerReady) {
-      toast.error('Both legends must be deposited before READY unlocks.');
-      return;
-    }
-    const you = room.participants.find((participant) => participant.address === account?.address);
-    roomSetReady(!you?.ready);
-  }, [account?.address, room.participants, roomIsConnected, roomModel.canReady, roomModel.playerReady, roomSetReady]);
+  }, [arena.currentMatchId, execute, loadMatch, walletMonsters]);
 
   const playFrames = useCallback(async () => {
     if (!battlePreview) return;
@@ -554,7 +578,7 @@ export function ArenaExperience() {
     );
   }
 
-  const loading = walletMonsters.isLoading || arenaMatches.isLoading;
+  const loading = walletMonsters.isLoading || arenaMatches.isLoading || recoveringFromChain;
 
   return (
     <PageShell title="Arena" subtitle="Invite. Deposit. Ready. Battle.">
@@ -619,7 +643,6 @@ export function ArenaExperience() {
           onCreateRoomMatch={handleCreateRoomMatch}
           onDeposit={handleDeposit}
           onWithdraw={handleWithdraw}
-          onToggleReady={handleToggleReady}
           onBattle={resolveBattle}
           onBackLobby={handleBackLobby}
         />
@@ -630,7 +653,14 @@ export function ArenaExperience() {
           preview={battlePreview}
           frameIndex={frameIndex}
           animating={animatingBattle}
-          canAttack={roomModel.canStartBattle && !resolution && pending === null}
+          canAttack={Boolean(
+            activeMatch &&
+            account.address &&
+            (activeMatch.player_a === account.address || activeMatch.player_b === account.address) &&
+            roomModel.canStartBattle &&
+            !resolution &&
+            pending === null
+          )}
           pending={pending}
           accountAddress={account.address}
           spectator={!activeMatch || (activeMatch.player_a !== account.address && activeMatch.player_b !== account.address)}

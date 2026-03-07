@@ -6,17 +6,11 @@ export type ArenaScreen = 'lobby' | 'room' | 'battle';
 
 export type RoomModel = {
   playerSide: 'a' | 'b' | null;
-  playerAReady: boolean;
-  playerBReady: boolean;
-  playerReady: boolean;
-  opponentReady: boolean;
   bothDeposited: boolean;
-  bothReady: boolean;
   playerDeposited: boolean;
   opponentDeposited: boolean;
   canDeposit: boolean;
   canWithdraw: boolean;
-  canReady: boolean;
   canStartBattle: boolean;
   heroTitle: string;
   heroHint: string;
@@ -158,21 +152,14 @@ export function buildRoomModel(input: {
   const sideAHasMonster = Boolean(match?.mon_a || match?.monster_a_data);
   const sideBHasMonster = Boolean(match?.mon_b || match?.monster_b_data);
 
-  const you = accountAddress ? participants.find((participant) => participant.address === accountAddress) : undefined;
   const opponent = accountAddress ? participants.find((participant) => participant.address !== accountAddress) : undefined;
 
   const playerDeposited = Boolean(match && playerSide && (playerSide === 'a' ? sideAHasMonster : sideBHasMonster));
   const opponentDeposited = Boolean(match && playerSide && (playerSide === 'a' ? sideBHasMonster : sideAHasMonster));
   const bothDeposited = Boolean(sideAHasMonster && sideBHasMonster);
-  const playerAReady = Boolean(match?.player_a && participants.find((participant) => participant.address === match.player_a)?.ready);
-  const playerBReady = Boolean(match?.player_b && participants.find((participant) => participant.address === match.player_b)?.ready);
-  const playerReady = Boolean(playerSide && (playerSide === 'a' ? playerAReady : playerBReady));
-  const opponentReady = Boolean(playerSide && (playerSide === 'a' ? playerBReady : playerAReady));
-  const bothReady = Boolean(bothDeposited && playerAReady && playerBReady);
   const canDeposit = Boolean(match && playerSide && match.status === 0 && !playerDeposited);
   const canWithdraw = Boolean(match && playerSide && match.status === 0 && playerDeposited);
-  const canReady = Boolean(match && playerSide && bothDeposited && match.status === 1);
-  const canStartBattle = Boolean(match && bothReady && match.status === 1 && !resolution);
+  const canStartBattle = Boolean(match && bothDeposited && match.status === 1 && !resolution);
 
   let heroTitle = 'Pick a trainer.';
   let heroHint = 'Invite a player, accept an invite, and build a room.';
@@ -204,35 +191,24 @@ export function buildRoomModel(input: {
       opponentStatusLabel = opponentDeposited ? 'Legend loaded' : opponent?.present ? 'Choosing legend' : 'Not in room';
     } else if (!opponentDeposited) {
       heroTitle = 'Waiting for the other side.';
-      heroHint = 'Your legend is loaded. They still need to deposit theirs.';
+      heroHint = 'Your legend is loaded. They still need to deposit theirs. You can withdraw safely until they do.';
       nextActionLabel = 'Wait';
       opponentStatusLabel = opponent?.present ? 'Needs deposit' : 'Left room';
-    } else if (!bothReady) {
-      heroTitle = 'Both legends loaded.';
-      heroHint = 'Tap READY after checking the wager and your monster.';
-      nextActionLabel = 'Ready';
-      opponentStatusLabel = opponent?.ready ? 'Ready' : opponent?.present ? 'Needs ready' : 'Left room';
     } else {
       heroTitle = 'Battle now.';
-      heroHint = 'Anyone can press ATTACK to resolve the fight on-chain.';
+      heroHint = 'Both legends are deposited. Anyone can start the battle now.';
       nextActionLabel = 'Battle';
-      opponentStatusLabel = 'Ready';
+      opponentStatusLabel = opponent?.present ? 'Deposited' : 'Locked in';
     }
   }
 
   return {
     playerSide,
-    playerAReady,
-    playerBReady,
-    playerReady,
-    opponentReady,
     bothDeposited,
-    bothReady,
     playerDeposited,
     opponentDeposited,
     canDeposit,
     canWithdraw,
-    canReady,
     canStartBattle,
     heroTitle,
     heroHint,

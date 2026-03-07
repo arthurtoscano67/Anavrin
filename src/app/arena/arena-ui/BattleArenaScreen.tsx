@@ -59,6 +59,18 @@ export function BattleArenaScreen({
     ? resolution.winner === match.player_a ? 'left' : 'right'
     : currentFrame?.winnerSide;
 
+  const winnerMonster = resolution
+    ? match.monster_a_data?.objectId === resolution.winnerMonsterId
+      ? match.monster_a_data
+      : match.monster_b_data?.objectId === resolution.winnerMonsterId
+        ? match.monster_b_data
+        : null
+    : null;
+
+  const winnerName = winnerMonster?.name
+    ?? (resolution?.winner === match.player_a ? match.monster_a_data?.name : match.monster_b_data?.name)
+    ?? 'Champion Legend';
+
   const iWin    = winnerSide === (isPlayerA ? 'left' : 'right');
   const enemyWin = winnerSide === (isPlayerA ? 'right' : 'left');
 
@@ -183,18 +195,41 @@ export function BattleArenaScreen({
 
       {/* ── resolution summary ── */}
       {resolution && (
-        <div className="poke-ui-box mt-3 grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
-          {[
-            { label: 'Winner',      value: short(resolution.winner),            color: 'text-green-300' },
-            { label: 'Winner Mon',  value: short(resolution.winnerMonsterId),   color: 'text-white'     },
-            { label: 'Loser Mon',   value: short(resolution.loserMonsterId),    color: 'text-white'     },
-            { label: 'Payout',      value: `${toSui(resolution.totalPayoutMist)} SUI`, color: 'text-yellow-200' },
-          ].map(({ label, value, color }) => (
-            <div key={label}>
-              <div className="text-[10px] font-bold uppercase tracking-widest text-white/40">{label}</div>
-              <div className={`mt-1 text-lg font-black ${color}`}>{value}</div>
+        <div className="space-y-3">
+          <div className="poke-ui-box grid gap-4 p-4 sm:grid-cols-[220px_1fr] sm:items-center">
+            <div className="rounded-2xl border border-yellow-300/20 bg-gradient-to-b from-yellow-300/10 via-fuchsia-300/5 to-transparent p-3">
+              <div className="mb-2 text-center text-[10px] font-bold uppercase tracking-[0.3em] text-yellow-200/80">Winner</div>
+              <div className="mx-auto h-44 w-44 rounded-2xl border border-white/10 bg-white/5 p-2 shadow-[0_0_24px_rgba(250,204,21,0.18)]">
+                <MonsterImage
+                  objectId={resolution.winnerMonsterId}
+                  monster={winnerMonster as any}
+                  className="h-full w-full"
+                />
+              </div>
             </div>
-          ))}
+
+            <div className="space-y-3">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-widest text-white/40">Champion Legend</div>
+                <div className="mt-1 text-2xl font-black text-yellow-100">{winnerName}</div>
+                <div className="mt-1 text-sm font-semibold text-green-300">{short(resolution.winner)} wins the battle</div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  { label: 'Winner', value: short(resolution.winner), color: 'text-green-300' },
+                  { label: 'Winner Mon', value: short(resolution.winnerMonsterId), color: 'text-white' },
+                  { label: 'Loser Mon', value: short(resolution.loserMonsterId), color: 'text-white' },
+                  { label: 'Payout', value: `${toSui(resolution.totalPayoutMist)} SUI`, color: 'text-yellow-200' },
+                ].map(({ label, value, color }) => (
+                  <div key={label}>
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-white/40">{label}</div>
+                    <div className={`mt-1 text-lg font-black ${color}`}>{value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
