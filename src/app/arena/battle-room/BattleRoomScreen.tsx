@@ -73,8 +73,10 @@ export function BattleRoomScreen({
   const waitingForMatch = Boolean(currentRoomId && !currentMatchId);
   const roomWaitingForTrainer = waitingForMatch && !canCreateRoomMatch;
   const roomCanOpen = waitingForMatch && canCreateRoomMatch;
-  const sideAStateLabel = roomModel.playerAReady ? 'Ready' : match?.mon_a ? 'Deposited' : playerAAddress ? 'Waiting' : 'Open';
-  const sideBStateLabel = roomModel.playerBReady ? 'Ready' : match?.mon_b ? 'Deposited' : playerBAddress ? 'Waiting' : 'Open';
+  const sideAHasMonster = Boolean(match?.mon_a || match?.monster_a_data);
+  const sideBHasMonster = Boolean(match?.mon_b || match?.monster_b_data);
+  const sideAStateLabel = roomModel.playerAReady ? 'Ready' : sideAHasMonster ? 'Deposited' : playerAAddress ? 'Waiting' : 'Open';
+  const sideBStateLabel = roomModel.playerBReady ? 'Ready' : sideBHasMonster ? 'Deposited' : playerBAddress ? 'Waiting' : 'Open';
   const showBattleButton = roomModel.bothReady && Boolean(currentMatchId);
 
   const ActionBadge = ({
@@ -127,7 +129,7 @@ export function BattleRoomScreen({
             title="Player A"
             address={playerAAddress}
             monster={playerAMonster}
-            ready={Boolean(match?.mon_a)}
+            ready={sideAHasMonster}
             side="left"
             stateLabel={sideAStateLabel}
           />
@@ -140,7 +142,7 @@ export function BattleRoomScreen({
             title="Player B"
             address={playerBAddress}
             monster={playerBMonster}
-            ready={Boolean(match?.mon_b)}
+            ready={sideBHasMonster}
             side="right"
             stateLabel={sideBStateLabel}
           />

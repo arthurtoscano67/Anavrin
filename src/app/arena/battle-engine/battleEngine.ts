@@ -153,13 +153,15 @@ export function buildRoomModel(input: {
         ? 'b'
         : null
     : null;
+  const sideAHasMonster = Boolean(match?.mon_a || match?.monster_a_data);
+  const sideBHasMonster = Boolean(match?.mon_b || match?.monster_b_data);
 
   const you = accountAddress ? participants.find((participant) => participant.address === accountAddress) : undefined;
   const opponent = accountAddress ? participants.find((participant) => participant.address !== accountAddress) : undefined;
 
-  const playerDeposited = Boolean(match && playerSide && (playerSide === 'a' ? match.mon_a : match.mon_b));
-  const opponentDeposited = Boolean(match && playerSide && (playerSide === 'a' ? match.mon_b : match.mon_a));
-  const bothDeposited = Boolean(match?.mon_a && match?.mon_b);
+  const playerDeposited = Boolean(match && playerSide && (playerSide === 'a' ? sideAHasMonster : sideBHasMonster));
+  const opponentDeposited = Boolean(match && playerSide && (playerSide === 'a' ? sideBHasMonster : sideAHasMonster));
+  const bothDeposited = Boolean(sideAHasMonster && sideBHasMonster);
   const playerAReady = Boolean(match?.player_a && participants.find((participant) => participant.address === match.player_a)?.ready);
   const playerBReady = Boolean(match?.player_b && participants.find((participant) => participant.address === match.player_b)?.ready);
   const bothReady = Boolean(bothDeposited && playerAReady && playerBReady);

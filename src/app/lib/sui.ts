@@ -42,28 +42,40 @@ function parseOptionId(value: unknown): string | null {
 }
 
 function parseOptionMonsterId(value: unknown): string | null {
-  if (!value) return null;
+  const fields = extractEmbeddedMonsterFields(value);
+  if (!fields) return null;
+  return parseObjectIdField(fields.id);
+}
+
+function parseObjectIdField(value: unknown): string | null {
   const rec = asRecord(value);
-  const vec = rec.vec as unknown[] | undefined;
-  if (Array.isArray(vec) && vec.length > 0) {
-    const first = asRecord(vec[0]);
-    const fields = asRecord(first.fields);
-    const id = asRecord(fields.id);
-    if (typeof id.id === "string") return id.id;
-  }
+  if (typeof rec.id === "string") return rec.id;
+  const nested = asRecord(rec.id);
+  if (typeof nested.id === "string") return nested.id;
   return null;
 }
 
-function parseEmbeddedArenaMonster(value: unknown): ArenaMonsterSnapshot | null {
+function extractEmbeddedMonsterFields(value: unknown): Record<string, unknown> | null {
   if (!value) return null;
   const rec = asRecord(value);
+  const directFields = asRecord(rec.fields);
+  if (parseObjectIdField(directFields.id)) {
+    return directFields;
+  }
+
   const vec = rec.vec as unknown[] | undefined;
   if (!Array.isArray(vec) || vec.length === 0) return null;
 
   const first = asRecord(vec[0]);
-  const fields = asRecord(first.fields);
-  const idFields = asRecord(fields.id);
-  const objectId = String(idFields.id ?? "");
+  const nestedFields = asRecord(first.fields);
+  return parseObjectIdField(nestedFields.id) ? nestedFields : null;
+}
+
+function parseEmbeddedArenaMonster(value: unknown): ArenaMonsterSnapshot | null {
+  const fields = extractEmbeddedMonsterFields(value);
+  if (!fields) return null;
+
+  const objectId = parseObjectIdField(fields.id) ?? "";
   if (!objectId) return null;
 
   return {
@@ -82,6 +94,17 @@ function parseEmbeddedArenaMonster(value: unknown): ArenaMonsterSnapshot | null 
     torn_wings: Number(fields.torn_wings ?? 0),
     created_at: String(fields.created_at ?? "0"),
   };
+}
+
+function parseBalanceValue(value: unknown): string {
+  if (typeof value === "string" || typeof value === "number" || typeof value === "bigint") {
+    return String(value);
+  }
+  const rec = asRecord(value);
+  if (rec.value !== undefined && rec.value !== null) {
+    return String(rec.value);
+  }
+  return "0";
 }
 
 export function parseMonster(data: SuiObjectData, location: "wallet" | "kiosk", kioskId?: string, priceMist?: string): Monster | null {
@@ -255,8 +278,8 @@ export async function fetchArenaMatch(client: SuiClient, matchId: string): Promi
     created_at: String(f.created_at ?? "0"),
     mon_a: parseOptionMonsterId(f.mon_a),
     mon_b: parseOptionMonsterId(f.mon_b),
-    stake_a: String(asRecord(f.stake_a).value ?? "0"),
-    stake_b: String(asRecord(f.stake_b).value ?? "0"),
+    stake_a: parseBalanceValue(f.stake_a),
+    stake_b: parseBalanceValue(f.stake_b),
     monster_a_data: parseEmbeddedArenaMonster(f.mon_a),
     monster_b_data: parseEmbeddedArenaMonster(f.mon_b),
   };
