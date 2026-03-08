@@ -129,6 +129,162 @@ function parseBalanceValue(value: unknown): string {
   return "0";
 }
 
+type GameConfigStats = {
+  battle_fee_bps: number;
+  xp_per_win: number;
+  xp_per_loss: number;
+  champion_xp_min: number;
+  emperor_xp_min: number;
+};
+
+function rankBonus(xp: number, config: GameConfigStats): number {
+  if (xp >= config.emperor_xp_min) return 60;
+  if (xp >= config.champion_xp_min) return 25;
+  return 0;
+}
+
+function formBonus(stage: number): number {
+  if (stage >= 2) return 40;
+  if (stage >= 1) return 20;
+  return 0;
+}
+
+function powerFromBattleSnapshot(
+  stats: { attack: number; defense: number; speed: number },
+  monster: Monster,
+  preBattleXp: number,
+  config: GameConfigStats
+): number {
+  return Math.floor(
+    stats.attack * 3 +
+      stats.defense * 2 +
+      stats.speed +
+      formBonus(monster.stage) +
+      rankBonus(preBattleXp, config) +
+      preBattleXp / 20
+  );
+}
+
+async function fetchGameConfigStats(client: SuiClient): Promise<GameConfigStats> {
+  const obj = await client.getObject({ id: TREASURY_ID, options: { showContent: true } });
+  const fields = asRecord((obj.data?.content as any)?.fields);
+  return {
+    battle_fee_bps: Number(fields.battle_fee_bps ?? 0),
+    xp_per_win: Number(fields.xp_per_win ?? 0),
+    xp_per_loss: Number(fields.xp_per_loss ?? 0),
+    champion_xp_min: Number(fields.champion_xp_min ?? 100),
+    emperor_xp_min: Number(fields.emperor_xp_min ?? 300),
+  };
+}
+
+async function fetchFinishedMatchSnapshots(
+  client: SuiClient,
+  previousTransaction: string,
+  playerA: string,
+  playerB: string
+): Promise<{
+  mon_a: string | null;
+  mon_b: string | null;
+  monster_a_data: ArenaMonsterSnapshot | null;
+  monster_b_data: ArenaMonsterSnapshot | null;
+  txDigest: string;
+  timestampMs: string;
+} | null> {
+  const tx = await client.getTransactionBlock({
+    digest: previousTransaction,
+    options: { showEffects: true, showObjectChanges: true },
+  });
+
+  const refs = tx.effects?.unwrapped ?? [];
+  if (!refs.length) return null;
+
+  const ownerById = new Map<string, string>();
+  for (const item of refs) {
+    const owner = (item.owner as { AddressOwner?: string })?.AddressOwner;
+    const objectId = item.reference?.objectId;
+    if (owner && objectId) ownerById.set(objectId, owner);
+  }
+
+  const ids = [...ownerById.keys()];
+  if (!ids.length) return null;
+
+  const objects = await client.multiGetObjects({
+    ids,
+    options: { showContent: true, showDisplay: true, showType: true },
+  });
+
+  let monsterA: Monster | null = null;
+  let monsterB: Monster | null = null;
+
+  for (const object of objects) {
+    const data = object.data;
+    if (!data) continue;
+    const parsed = parseMonster(data, "wallet");
+    if (!parsed) continue;
+
+    const owner = ownerById.get(parsed.objectId);
+    if (owner === playerA) monsterA = parsed;
+    if (owner === playerB) monsterB = parsed;
+  }
+
+  return {
+    mon_a: monsterA?.objectId ?? null,
+    mon_b: monsterB?.objectId ?? null,
+    monster_a_data: monsterA,
+    monster_b_data: monsterB,
+    txDigest: previousTransaction,
+    timestampMs: String((tx as { timestampMs?: string | number | null }).timestampMs ?? "0"),
+  };
+}
+
+function inferWinnerSideFromFinishedMatch(
+  match: ArenaMatch,
+  config: GameConfigStats
+): "left" | "right" {
+  const left = match.monster_a_data as Monster | undefined | null;
+  const right = match.monster_b_data as Monster | undefined | null;
+  if (!left || !right) return "left";
+
+  const leftStats = {
+    attack: Number((match as any).battle_attack_a ?? left.attack ?? 0),
+    defense: Number((match as any).battle_defense_a ?? left.defense ?? 0),
+    speed: Number((match as any).battle_speed_a ?? left.speed ?? 0),
+  };
+  const rightStats = {
+    attack: Number((match as any).battle_attack_b ?? right.attack ?? 0),
+    defense: Number((match as any).battle_defense_b ?? right.defense ?? 0),
+    speed: Number((match as any).battle_speed_b ?? right.speed ?? 0),
+  };
+
+  const leftAsWinnerXp = Math.max(0, left.xp - config.xp_per_win);
+  const rightAsLoserXp = Math.max(0, right.xp - config.xp_per_loss);
+  const leftPowerIfWinner = powerFromBattleSnapshot(leftStats, left, leftAsWinnerXp, config);
+  const rightPowerIfLoser = powerFromBattleSnapshot(rightStats, right, rightAsLoserXp, config);
+  const leftConsistent =
+    leftPowerIfWinner > rightPowerIfLoser ||
+    (leftPowerIfWinner === rightPowerIfLoser && BigInt(left.seed) <= BigInt(right.seed));
+
+  const rightAsWinnerXp = Math.max(0, right.xp - config.xp_per_win);
+  const leftAsLoserXp = Math.max(0, left.xp - config.xp_per_loss);
+  const rightPowerIfWinner = powerFromBattleSnapshot(rightStats, right, rightAsWinnerXp, config);
+  const leftPowerIfLoser = powerFromBattleSnapshot(leftStats, left, leftAsLoserXp, config);
+  const rightConsistent =
+    rightPowerIfWinner > leftPowerIfLoser ||
+    (rightPowerIfWinner === leftPowerIfLoser && BigInt(right.seed) < BigInt(left.seed));
+
+  if (leftConsistent && !rightConsistent) return "left";
+  if (rightConsistent && !leftConsistent) return "right";
+
+  if ((left.current_health ?? 0) !== (right.current_health ?? 0)) {
+    return (left.current_health ?? 0) > (right.current_health ?? 0) ? "left" : "right";
+  }
+
+  const directLeftPower = powerFromBattleSnapshot(leftStats, left, leftAsLoserXp, config);
+  const directRightPower = powerFromBattleSnapshot(rightStats, right, rightAsLoserXp, config);
+  if (directLeftPower !== directRightPower) return directLeftPower > directRightPower ? "left" : "right";
+  return BigInt(left.seed) <= BigInt(right.seed) ? "left" : "right";
+}
+
 export function parseMonster(data: SuiObjectData, location: "wallet" | "kiosk", kioskId?: string, priceMist?: string): Monster | null {
   if (!data.content || data.content.dataType !== "moveObject") return null;
   const f = asRecord(data.content.fields);
@@ -332,13 +488,13 @@ export async function fetchMintedMonsters(client: SuiClient): Promise<Monster[]>
 }
 
 export async function fetchArenaMatch(client: SuiClient, matchId: string): Promise<ArenaMatch | null> {
-  const obj = await client.getObject({ id: matchId, options: { showContent: true } });
+  const obj = await client.getObject({ id: matchId, options: { showContent: true, showPreviousTransaction: true } });
   const c = obj.data?.content;
   if (!c || c.dataType !== "moveObject") return null;
   if (c.type !== ARENA_MATCH_TYPE) return null;
 
   const f = asRecord(c.fields);
-  return {
+  const match: ArenaMatch = {
     objectId: obj.data!.objectId,
     player_a: String(f.player_a ?? ""),
     player_b: String(f.player_b ?? ""),
@@ -346,13 +502,46 @@ export async function fetchArenaMatch(client: SuiClient, matchId: string): Promi
     created_at: String(f.created_at ?? "0"),
     last_update: String(f.last_update ?? "0"),
     mode: Number(f.mode ?? 0),
+    previousTransaction: String(obj.data?.previousTransaction ?? ""),
     mon_a: parseOptionMonsterId(f.martian_a ?? f.mon_a),
     mon_b: parseOptionMonsterId(f.martian_b ?? f.mon_b),
     stake_a: parseBalanceValue(f.stake_a),
     stake_b: parseBalanceValue(f.stake_b),
+    battle_attack_a: Number(f.battle_attack_a ?? 0),
+    battle_defense_a: Number(f.battle_defense_a ?? 0),
+    battle_speed_a: Number(f.battle_speed_a ?? 0),
+    battle_attack_b: Number(f.battle_attack_b ?? 0),
+    battle_defense_b: Number(f.battle_defense_b ?? 0),
+    battle_speed_b: Number(f.battle_speed_b ?? 0),
     monster_a_data: parseEmbeddedArenaMonster(f.martian_a ?? f.mon_a),
     monster_b_data: parseEmbeddedArenaMonster(f.martian_b ?? f.mon_b),
   };
+
+  if (
+    match.status === 2 &&
+    !match.monster_a_data &&
+    !match.monster_b_data &&
+    match.previousTransaction
+  ) {
+    try {
+      const restored = await fetchFinishedMatchSnapshots(
+        client,
+        match.previousTransaction,
+        match.player_a,
+        match.player_b
+      );
+      if (restored) {
+        match.mon_a = restored.mon_a;
+        match.mon_b = restored.mon_b;
+        match.monster_a_data = restored.monster_a_data;
+        match.monster_b_data = restored.monster_b_data;
+      }
+    } catch {
+      // Best-effort restoration for completed matches.
+    }
+  }
+
+  return match;
 }
 
 export function extractCreatedArenaMatchId(block: {
@@ -525,6 +714,31 @@ export async function fetchMatchResolution(
   }
 
   return resolution;
+}
+
+export async function fetchSyntheticMatchResolution(
+  client: SuiClient,
+  match: ArenaMatch
+): Promise<MatchResolution | null> {
+  if (match.status !== 2 || !match.previousTransaction || !match.monster_a_data || !match.monster_b_data) {
+    return null;
+  }
+
+  const config = await fetchGameConfigStats(client);
+  const winnerSide = inferWinnerSideFromFinishedMatch(match, config);
+  const totalPayout = BigInt(match.stake_a || "0") + BigInt(match.stake_b || "0");
+  const feeMist = totalPayout > 0n ? (totalPayout * BigInt(config.battle_fee_bps)) / 10_000n : 0n;
+
+  return {
+    matchId: match.objectId,
+    winner: winnerSide === "left" ? match.player_a : match.player_b,
+    winnerMonsterId: winnerSide === "left" ? match.monster_a_data.objectId : match.monster_b_data.objectId,
+    loserMonsterId: winnerSide === "left" ? match.monster_b_data.objectId : match.monster_a_data.objectId,
+    totalPayoutMist: totalPayout.toString(),
+    feeMist: feeMist.toString(),
+    txDigest: match.previousTransaction,
+    timestampMs: match.last_update ?? match.created_at,
+  };
 }
 
 function parseListing(parsed: Record<string, unknown>, txDigest: string): Listing | null {

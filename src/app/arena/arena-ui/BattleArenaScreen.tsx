@@ -127,6 +127,8 @@ export function BattleArenaScreen({
 
   const battleLog = resolution
     ? `${short(resolution.winner)} wins! Payout: ${toSui(resolution.totalPayoutMist)} SUI`
+    : match.status === 2
+      ? 'Battle finished on-chain. Martians returned to their wallets.'
     : currentFrame?.label ?? (canAttack
       ? `What will ${myMonster?.name ?? 'your Martian'} do?`
       : 'Waiting for both players…');

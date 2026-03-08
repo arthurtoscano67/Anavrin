@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useSuiClient } from '@mysten/dapp-kit';
 
-import { fetchArenaMatch, fetchMatchResolution } from '../lib/sui';
+import { fetchArenaMatch, fetchMatchResolution, fetchSyntheticMatchResolution } from '../lib/sui';
 
 export function useBattleMatch(matchId?: string) {
   const client = useSuiClient();
@@ -15,10 +15,11 @@ export function useBattleMatch(matchId?: string) {
         return { match: null, resolution: null };
       }
 
-      const [match, resolution] = await Promise.all([
-        fetchArenaMatch(client, matchId),
-        fetchMatchResolution(client, matchId),
-      ]);
+      const match = await fetchArenaMatch(client, matchId);
+      let resolution = await fetchMatchResolution(client, matchId);
+      if (!resolution && match?.status === 2) {
+        resolution = await fetchSyntheticMatchResolution(client, match);
+      }
 
       return { match, resolution };
     },

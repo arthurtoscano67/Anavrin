@@ -76,10 +76,17 @@ export type ArenaMatch = {
   created_at: string;
   last_update?: string;
   mode?: number;
+  previousTransaction?: string;
   mon_a?: string | null;
   mon_b?: string | null;
   stake_a: string;
   stake_b: string;
+  battle_attack_a?: number;
+  battle_defense_a?: number;
+  battle_speed_a?: number;
+  battle_attack_b?: number;
+  battle_defense_b?: number;
+  battle_speed_b?: number;
   monster_a_data?: ArenaMonsterSnapshot | null;
   monster_b_data?: ArenaMonsterSnapshot | null;
 };
