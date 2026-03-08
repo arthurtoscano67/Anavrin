@@ -8,6 +8,7 @@ import { Spinner } from "../components/Spinner";
 import {
   CLOCK_ID,
   ITEM_DEFINITION_TYPE,
+  ITEMS_ADMIN_CAP_ID,
   ITEMS_MODULE,
   ITEMS_PACKAGE_ID,
 } from "../lib/constants";
@@ -17,7 +18,7 @@ import { fetchItemDefinitions, parseItemDefinition } from "../lib/sui";
 import type { ItemDefinition } from "../lib/types";
 import { useTxExecutor } from "../hooks/useTxExecutor";
 
-const ADMIN_CAP_OBJECT_ID = (import.meta.env.VITE_ITEMS_ADMIN_CAP_ID ?? "").trim();
+const ADMIN_CAP_OBJECT_ID = (import.meta.env.VITE_ITEMS_ADMIN_CAP_ID ?? ITEMS_ADMIN_CAP_ID).trim();
 const ITEMS_ADMIN_CAP_TYPE = `${ITEMS_PACKAGE_ID}::${ITEMS_MODULE}::AdminCap`;
 
 const ITEM_TYPES = [
