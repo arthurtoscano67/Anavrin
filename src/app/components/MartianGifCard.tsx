@@ -1,5 +1,6 @@
 import type { Monster } from "../lib/types";
 import { short } from "../lib/format";
+import { MartianHealthBar } from "./MartianHealthBar";
 import { MartianGifImage } from "./MartianGifImage";
 import { StageBadge } from "./StageBadge";
 import { StatBar } from "./StatBar";
@@ -41,6 +42,10 @@ export function MartianGifCard({
         </div>
 
         <div className="space-y-2">
+          <MartianHealthBar
+            currentHealth={Number(monster.current_health ?? 0)}
+            maxHealth={Number(monster.max_health ?? 0)}
+          />
           <StatBar label="ATK" value={monster.attack} color="bg-red-500" />
           <StatBar label="DEF" value={monster.defense} color="bg-blue-500" />
           <StatBar label="SPD" value={monster.speed} color="bg-green-500" />

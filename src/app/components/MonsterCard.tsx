@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 
 import type { Monster } from "../lib/types";
 import { short } from "../lib/format";
+import { MartianHealthBar } from "./MartianHealthBar";
 import { MonsterImage } from "./MonsterImage";
 import { StageBadge } from "./StageBadge";
 import { StatBar } from "./StatBar";
@@ -42,6 +43,10 @@ export function MonsterCard({
         </div>
 
         <div className="space-y-2">
+          <MartianHealthBar
+            currentHealth={Number(monster.current_health ?? 0)}
+            maxHealth={Number(monster.max_health ?? 0)}
+          />
           <StatBar label="ATK" value={monster.attack} color="bg-red-500" />
           <StatBar label="DEF" value={monster.defense} color="bg-blue-500" />
           <StatBar label="SPD" value={monster.speed} color="bg-green-500" />

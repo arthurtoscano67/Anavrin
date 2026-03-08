@@ -70,6 +70,29 @@ body {
   max-width: 100%;
 }
 
+.hp-bar {
+  @apply h-2.5 overflow-hidden rounded-full bg-white/10;
+}
+
+.hp-fill {
+  @apply h-full rounded-full transition-[width,background-color,box-shadow] duration-500 ease-out;
+}
+
+.hp-fill-green {
+  background: linear-gradient(90deg, rgba(34, 197, 94, 0.92), rgba(74, 222, 128, 0.98));
+  box-shadow: 0 0 14px rgba(34, 197, 94, 0.3);
+}
+
+.hp-fill-yellow {
+  background: linear-gradient(90deg, rgba(234, 179, 8, 0.92), rgba(250, 204, 21, 0.98));
+  box-shadow: 0 0 14px rgba(234, 179, 8, 0.28);
+}
+
+.hp-fill-red {
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.92), rgba(248, 113, 113, 0.98));
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.28);
+}
+
 .nav-link {
   @apply px-3 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5;
 }
