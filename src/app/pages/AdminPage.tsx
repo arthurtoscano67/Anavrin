@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
+import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 
 import { PageShell } from "../components/PageShell";
@@ -149,6 +150,16 @@ export function AdminPage() {
       title="Admin Dashboard"
       subtitle="Live mint controls plus emergency cancellation for stuck Martian battles."
     >
+      <div className="glass-card flex flex-col gap-3 rounded-[24px] border border-lime-300/20 bg-lime-400/10 p-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <div className="text-xs uppercase tracking-[0.22em] text-lime-100/80">Items Console</div>
+          <div className="mt-1 text-sm text-lime-50">Open the secure item-definition dashboard for the `items` package.</div>
+        </div>
+        <Link to="/admin/items" className="btn-primary border-lime-300/35 bg-lime-400/85 text-slate-950 hover:bg-lime-300">
+          Open Item Creator
+        </Link>
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="glass-card space-y-4 p-4 lg:col-span-2">
           <div className="flex items-center justify-between gap-3">

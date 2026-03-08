@@ -653,11 +653,14 @@ async function discoverItemDefinitionIds(client: SuiClient): Promise<string[]> {
   return [...ids];
 }
 
-export async function fetchItemDefinitions(client: SuiClient): Promise<ItemDefinition[]> {
+export async function fetchItemDefinitions(
+  client: SuiClient,
+  options?: { includeDisabled?: boolean }
+): Promise<ItemDefinition[]> {
   const ids = await discoverItemDefinitionIds(client);
   const definitions = await fetchItemDefinitionsByIds(client, ids);
   return definitions
-    .filter((definition) => definition.enabled)
+    .filter((definition) => options?.includeDisabled ? true : definition.enabled)
     .sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name));
 }
 

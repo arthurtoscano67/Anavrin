@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { Header } from "./components/Header";
 import { AdminPage } from "./pages/AdminPage";
+import { AdminItemsPage } from "./pages/AdminItemsPage";
 import { BattlePage } from "./pages/BattlePage";
 import { BreedPage } from "./pages/BreedPage";
 import { GalleryPage } from "./pages/GalleryPage";
@@ -24,6 +25,7 @@ export function App() {
           <Route path="/legends" element={<Navigate to="/my-monsters" replace />} />
           <Route path="/my-monsters" element={<MyLegendsPage />} />
           <Route path="/items" element={<ItemsPage />} />
+          <Route path="/admin/items" element={<AdminItemsPage />} />
           <Route path="/breeding" element={<BreedPage />} />
           <Route path="/gallery" element={<GalleryPage />} />
           <Route path="/arena" element={<Navigate to="/lobby" replace />} />
