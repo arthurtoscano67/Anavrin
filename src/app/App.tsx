@@ -22,13 +22,14 @@ export function App() {
           <Route path="/" element={<MintPage />} />
           <Route path="/legends" element={<Navigate to="/my-monsters" replace />} />
           <Route path="/my-monsters" element={<MyLegendsPage />} />
+          <Route path="/breeding" element={<BreedPage />} />
           <Route path="/gallery" element={<GalleryPage />} />
           <Route path="/arena" element={<Navigate to="/lobby" replace />} />
           <Route path="/lobby" element={<LobbyPage />} />
           <Route path="/queue" element={<QueuePage />} />
           <Route path="/battle/:matchId" element={<BattlePage />} />
           <Route path="/spectate/:matchId" element={<SpectatePage />} />
-          <Route path="/breed" element={<BreedPage />} />
+          <Route path="/breed" element={<Navigate to="/breeding" replace />} />
           <Route path="/market" element={<MarketplacePage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="/admin" element={<AdminPage />} />

@@ -25,6 +25,7 @@ export const STAGE_META: Record<number, { label: string; color: string; emoji: s
 export const ROUTES = [
   { path: "/", label: "Mint" },
   { path: "/my-monsters", label: "My Martians" },
+  { path: "/breeding", label: "Breeding" },
   { path: "/gallery", label: "Gallery" },
   { path: "/lobby", label: "Lobby" },
   { path: "/queue", label: "Queue" },
