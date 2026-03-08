@@ -258,7 +258,7 @@ export function ItemsPage() {
                 No items in your backpack yet.
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+              <div className="grid grid-cols-2 gap-4 xl:grid-cols-3">
                 {ownedItems.map((item) => (
                   <ItemCard
                     key={item.objectId}
