@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { Header } from "./components/Header";
 import { AdminPage } from "./pages/AdminPage";
 import { AdminItemsPage } from "./pages/AdminItemsPage";
+import { AvatarDashboardPage } from "./pages/AvatarDashboardPage";
 import { BattlePage } from "./pages/BattlePage";
 import { BreedPage } from "./pages/BreedPage";
 import { GalleryPage } from "./pages/GalleryPage";
@@ -21,6 +22,7 @@ export function App() {
       <Header />
       <main className="mx-auto max-w-7xl px-4 py-6 md:py-8">
         <Routes>
+          <Route path="/avatar" element={<AvatarDashboardPage />} />
           <Route path="/" element={<MintPage />} />
           <Route path="/legends" element={<Navigate to="/my-monsters" replace />} />
           <Route path="/my-monsters" element={<MyLegendsPage />} />
