@@ -10,16 +10,20 @@ import {
   PACKAGE_ID,
   TREASURY_ID,
 } from "./sui_constants";
+import { ITEM_DEFINITION_TYPE, ITEMS_MODULE, ITEMS_PACKAGE_ID, ITEM_TYPE } from "./constants";
+import { resolveEquipmentSlot, resolveItemKind } from "./items";
 import type {
   ActivePlayer,
   ArenaMatch,
   ArenaMonsterSnapshot,
   BattleOutcomeEvent,
+  ItemDefinition,
   KioskCap,
   Listing,
   MatchResolution,
   Monster,
   MonsterGearSlots,
+  PlayerItem,
   TreasuryConfig,
 } from "./types";
 
@@ -49,11 +53,36 @@ function parseOptionMonsterId(value: unknown): string | null {
 }
 
 function parseObjectIdField(value: unknown): string | null {
+  if (typeof value === "string") return value;
   const rec = asRecord(value);
   if (typeof rec.id === "string") return rec.id;
+  if (typeof rec.bytes === "string") {
+    return rec.bytes.startsWith("0x") ? rec.bytes : `0x${rec.bytes}`;
+  }
   const nested = asRecord(rec.id);
   if (typeof nested.id === "string") return nested.id;
+  if (typeof nested.bytes === "string") {
+    return nested.bytes.startsWith("0x") ? nested.bytes : `0x${nested.bytes}`;
+  }
   return null;
+}
+
+function parseMoveString(value: unknown): string {
+  if (typeof value === "string") return value;
+  const rec = asRecord(value);
+  if (typeof rec.bytes === "string") return rec.bytes;
+  if (Array.isArray(rec.bytes)) {
+    const bytes = rec.bytes.filter((entry): entry is number => typeof entry === "number");
+    if (bytes.length > 0) {
+      try {
+        return new TextDecoder().decode(Uint8Array.from(bytes));
+      } catch {
+        // Fall back to string coercion below.
+      }
+    }
+  }
+  if (typeof rec.value === "string") return rec.value;
+  return String(value ?? "");
 }
 
 function extractEmbeddedMonsterFields(value: unknown): Record<string, unknown> | null {
@@ -317,6 +346,69 @@ export function parseMonster(data: SuiObjectData, location: "wallet" | "kiosk", 
   };
 }
 
+export function parseItemDefinition(data: SuiObjectData): ItemDefinition | null {
+  const content = data.content;
+  if (!content || content.dataType !== "moveObject") return null;
+  if (content.type !== ITEM_DEFINITION_TYPE) return null;
+
+  const fields = asRecord(content.fields);
+  const name = parseMoveString(fields.name ?? "Mystery Item");
+  const itemType = Number(fields.item_type ?? 0);
+  const kind = resolveItemKind(itemType);
+
+  return {
+    objectId: data.objectId,
+    name,
+    itemType,
+    kind,
+    slot: resolveEquipmentSlot(name, kind),
+    healAmount: Number(fields.heal_amount ?? 0),
+    attackBonus: Number(fields.attack_bonus ?? 0),
+    defenseBonus: Number(fields.defense_bonus ?? 0),
+    priceMist: String(fields.price_mist ?? "0"),
+    durationMs: Number(fields.duration_ms ?? 0),
+    supplyLimit: Number(fields.supply_limit ?? 0),
+    minted: Number(fields.minted ?? 0),
+    enabled: Boolean(fields.enabled),
+  };
+}
+
+function parsePlayerItem(
+  data: SuiObjectData,
+  definitionsById: Map<string, ItemDefinition>
+): PlayerItem | null {
+  const content = data.content;
+  if (!content || content.dataType !== "moveObject") return null;
+  if (content.type !== ITEM_TYPE) return null;
+
+  const fields = asRecord(content.fields);
+  const definitionId = parseObjectIdField(fields.definition_id) ?? "";
+  const definition = definitionsById.get(definitionId) ?? null;
+  const itemType = definition?.itemType ?? -1;
+  const kind = definition?.kind ?? resolveItemKind(itemType);
+  const name = definition?.name ?? "Mystery Item";
+
+  return {
+    objectId: data.objectId,
+    definitionId,
+    expirationMs: Number(fields.expiration_ms ?? 0),
+    equipped: Boolean(fields.equipped),
+    name,
+    itemType,
+    kind,
+    slot: definition?.slot ?? resolveEquipmentSlot(name, kind),
+    healAmount: definition?.healAmount ?? 0,
+    attackBonus: definition?.attackBonus ?? 0,
+    defenseBonus: definition?.defenseBonus ?? 0,
+    priceMist: definition?.priceMist ?? "0",
+    durationMs: definition?.durationMs ?? 0,
+    supplyLimit: definition?.supplyLimit ?? 0,
+    minted: definition?.minted ?? 0,
+    enabled: definition?.enabled ?? true,
+    definition,
+  };
+}
+
 export async function fetchTreasury(client: SuiClient): Promise<TreasuryConfig> {
   const obj = await client.getObject({ id: TREASURY_ID, options: { showContent: true } });
   const f = asRecord((obj.data?.content as any)?.fields);
@@ -454,6 +546,133 @@ function chunk<T>(items: T[], size: number): T[][] {
     out.push(items.slice(i, i + size));
   }
   return out;
+}
+
+async function fetchAllOwnedObjectsByType(
+  client: SuiClient,
+  owner: string,
+  structType: string
+): Promise<SuiObjectData[]> {
+  let cursor: string | null | undefined = null;
+  const objects: SuiObjectData[] = [];
+
+  for (let page = 0; page < 12; page += 1) {
+    const response = await client.getOwnedObjects({
+      owner,
+      filter: { StructType: structType },
+      cursor,
+      limit: 50,
+      options: { showContent: true, showDisplay: true, showType: true },
+    });
+
+    objects.push(
+      ...response.data
+        .map((entry) => entry.data)
+        .filter((entry): entry is SuiObjectData => Boolean(entry))
+    );
+
+    if (!response.hasNextPage || !response.nextCursor) break;
+    cursor = response.nextCursor;
+  }
+
+  return objects;
+}
+
+async function fetchItemDefinitionsByIds(
+  client: SuiClient,
+  ids: string[]
+): Promise<ItemDefinition[]> {
+  if (ids.length === 0) return [];
+
+  const responses = await Promise.all(
+    chunk(Array.from(new Set(ids)), 50).map((part) =>
+      client.multiGetObjects({
+        ids: part,
+        options: { showContent: true, showType: true },
+      })
+    )
+  );
+
+  return responses
+    .flatMap((part) => part)
+    .map((obj) => obj.data)
+    .filter((obj): obj is SuiObjectData => Boolean(obj))
+    .map((obj) => parseItemDefinition(obj))
+    .filter((definition): definition is ItemDefinition => Boolean(definition));
+}
+
+async function discoverItemDefinitionIds(client: SuiClient): Promise<string[]> {
+  const ids = new Set<string>();
+
+  for (const fn of ["create_item_definition", "buy_item"]) {
+    let cursor: string | null | undefined = null;
+
+    for (let page = 0; page < 12; page += 1) {
+      const response = await client.queryTransactionBlocks({
+        filter: {
+          MoveFunction: {
+            package: ITEMS_PACKAGE_ID,
+            module: ITEMS_MODULE,
+            function: fn,
+          },
+        },
+        cursor,
+        limit: 50,
+        order: "descending",
+        options: { showObjectChanges: true, showEvents: true },
+      });
+
+      for (const tx of response.data) {
+        for (const change of tx.objectChanges ?? []) {
+          const candidate = change as {
+            type?: string;
+            objectType?: string;
+            objectId?: string;
+          };
+          if (
+            (candidate.type === "created" || candidate.type === "mutated") &&
+            candidate.objectType === ITEM_DEFINITION_TYPE &&
+            typeof candidate.objectId === "string"
+          ) {
+            ids.add(candidate.objectId);
+          }
+        }
+
+        for (const event of tx.events ?? []) {
+          if (event.type !== `${ITEMS_PACKAGE_ID}::${ITEMS_MODULE}::ItemPurchased`) continue;
+          const definitionId = parseObjectIdField(asRecord(event.parsedJson).definition_id);
+          if (definitionId) ids.add(definitionId);
+        }
+      }
+
+      if (!response.hasNextPage || !response.nextCursor) break;
+      cursor = response.nextCursor;
+    }
+  }
+
+  return [...ids];
+}
+
+export async function fetchItemDefinitions(client: SuiClient): Promise<ItemDefinition[]> {
+  const ids = await discoverItemDefinitionIds(client);
+  const definitions = await fetchItemDefinitionsByIds(client, ids);
+  return definitions
+    .filter((definition) => definition.enabled)
+    .sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name));
+}
+
+export async function fetchOwnedItems(client: SuiClient, owner: string): Promise<PlayerItem[]> {
+  const objects = await fetchAllOwnedObjectsByType(client, owner, ITEM_TYPE);
+  const definitionIds = objects
+    .map((obj) => parseObjectIdField(asRecord((obj.content as { fields?: unknown } | null)?.fields).definition_id))
+    .filter((id): id is string => Boolean(id));
+  const definitions = await fetchItemDefinitionsByIds(client, definitionIds);
+  const definitionsById = new Map(definitions.map((definition) => [definition.objectId, definition]));
+
+  return objects
+    .map((obj) => parsePlayerItem(obj, definitionsById))
+    .filter((item): item is PlayerItem => Boolean(item))
+    .sort((a, b) => Number(b.equipped) - Number(a.equipped) || a.name.localeCompare(b.name));
 }
 
 export async function fetchMintedMonsters(client: SuiClient): Promise<Monster[]> {

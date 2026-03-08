@@ -40,6 +40,46 @@ export type KioskCap = {
   version?: string;
 };
 
+export type ItemKind = "Potion" | "Armor" | "Weapon" | "Unknown";
+
+export type EquipmentSlotId = "helmet" | "armor" | "weapon" | "potion";
+
+export type ItemDefinition = {
+  objectId: string;
+  name: string;
+  itemType: number;
+  kind: ItemKind;
+  slot: EquipmentSlotId;
+  healAmount: number;
+  attackBonus: number;
+  defenseBonus: number;
+  priceMist: string;
+  durationMs: number;
+  supplyLimit: number;
+  minted: number;
+  enabled: boolean;
+};
+
+export type PlayerItem = {
+  objectId: string;
+  definitionId: string;
+  expirationMs: number;
+  equipped: boolean;
+  name: string;
+  itemType: number;
+  kind: ItemKind;
+  slot: EquipmentSlotId;
+  healAmount: number;
+  attackBonus: number;
+  defenseBonus: number;
+  priceMist: string;
+  durationMs: number;
+  supplyLimit: number;
+  minted: number;
+  enabled: boolean;
+  definition: ItemDefinition | null;
+};
+
 export type ArenaStatus = 0 | 1 | 2 | 3;
 
 export type ArenaMonsterSnapshot = {
