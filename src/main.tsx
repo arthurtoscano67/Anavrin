@@ -18,7 +18,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <SuiClientProvider networks={networks} defaultNetwork="mainnet">
-        <WalletProvider preferredWallets={["Slush", "Suiet"]} autoConnect>
+        <WalletProvider
+          preferredWallets={["Slush", "Suiet", "Ethos Wallet"]}
+          storageKey="anavrin:wallet"
+          autoConnect
+        >
           <BrowserRouter>
             <App />
             <Toaster richColors position="top-right" />

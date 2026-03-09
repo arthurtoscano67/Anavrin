@@ -2,11 +2,7 @@ import { useCallback, useState } from "react";
 import { useCurrentAccount } from "@mysten/dapp-kit";
 
 import { useTxExecutor } from "./useTxExecutor";
-import {
-  buildPauseMintTx,
-  buildResumeMintTx,
-  buildSetMintPriceTx,
-} from "../lib/avatarTransactions";
+import { buildPauseMintTx, buildResumeMintTx, buildSetMintPriceTx } from "../lib/avatarTransactions";
 
 type PendingAction = "pause" | "resume" | "set-price" | null;
 
