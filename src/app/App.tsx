@@ -25,7 +25,8 @@ export function App() {
         <Routes>
           <Route path="/anavrin" element={<AnavrinPage />} />
           <Route path="/avatar" element={<AvatarDashboardPage />} />
-          <Route path="/" element={<MintPage />} />
+          <Route path="/" element={<Navigate to="/anavrin" replace />} />
+          <Route path="/mint" element={<MintPage />} />
           <Route path="/legends" element={<Navigate to="/my-monsters" replace />} />
           <Route path="/my-monsters" element={<MyLegendsPage />} />
           <Route path="/items" element={<ItemsPage />} />
@@ -41,7 +42,7 @@ export function App() {
           <Route path="/market" element={<MarketplacePage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="/admin" element={<AdminPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/anavrin" replace />} />
         </Routes>
       </main>
     </div>

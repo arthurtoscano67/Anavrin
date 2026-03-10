@@ -38,7 +38,7 @@ export function Header() {
             <NavLink
               key={r.path}
               to={r.path}
-              end={r.path === "/"}
+              end={r.path === "/anavrin"}
               className={({ isActive }) =>
                 `nav-link flex min-h-[44px] items-center justify-center text-center ${isActive ? 'nav-link-active' : ''}`
               }
