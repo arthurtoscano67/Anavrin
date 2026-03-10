@@ -1,4 +1,4 @@
-import { ContactShadows, Environment, PresentationControls, useFBX, useTexture } from "@react-three/drei";
+import { ContactShadows, Environment, PresentationControls, useFBX, useGLTF, useTexture } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Suspense, useEffect, useMemo, useRef } from "react";
 import { clone } from "three/examples/jsm/utils/SkeletonUtils.js";
@@ -58,6 +58,8 @@ type RigBone = {
   restY: number;
   restZ: number;
 };
+
+const PREMIUM_MODEL_PATH = ANAVRIN_CONFIG.assets.previewCharacters.premium.model;
 
 const MODEL_LIBRARY = {
   masculine: {
@@ -801,10 +803,184 @@ function TexturedAvatarFigure({ draft, locomotion = "idle" }: AvatarFigureProps)
   );
 }
 
+function Wolf3DAvatarFigure({ draft, locomotion = "idle" }: AvatarFigureProps) {
+  const { scene } = useGLTF(PREMIUM_MODEL_PATH);
+  const wrapperRef = useRef<Group>(null);
+  const auraRef = useRef<Group>(null);
+  const normalizedModel = useMemo(() => {
+    const cloned = clone(scene) as Group;
+    const box = new Box3().setFromObject(cloned);
+    const size = new Vector3();
+    const center = new Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+    const scale = size.y > 0 ? 2.05 / size.y : 1;
+
+    cloned.scale.setScalar(scale);
+    cloned.position.set(-center.x * scale, -box.min.y * scale - 0.96, -center.z * scale);
+    return cloned;
+  }, [scene]);
+  const leftArm = useMemo(
+    () => collectBone(normalizedModel, ["left", "arm"]),
+    [normalizedModel]
+  );
+  const rightArm = useMemo(
+    () => collectBone(normalizedModel, ["right", "arm"]),
+    [normalizedModel]
+  );
+  const leftForeArm = useMemo(
+    () => collectBone(normalizedModel, ["left", "forearm"]),
+    [normalizedModel]
+  );
+  const rightForeArm = useMemo(
+    () => collectBone(normalizedModel, ["right", "forearm"]),
+    [normalizedModel]
+  );
+  const leftUpLeg = useMemo(
+    () => collectBone(normalizedModel, ["left", "upleg"]),
+    [normalizedModel]
+  );
+  const rightUpLeg = useMemo(
+    () => collectBone(normalizedModel, ["right", "upleg"]),
+    [normalizedModel]
+  );
+  const spine = useMemo(
+    () => collectBone(normalizedModel, ["spine"]),
+    [normalizedModel]
+  );
+  const head = useMemo(
+    () => collectBone(normalizedModel, ["head"]),
+    [normalizedModel]
+  );
+  const accessoryColor = ACCESSORY_COLORS[draft.starter_style.accessory] ?? "#b8c0cc";
+  const auraColor = AURA_COLORS[draft.starter_style.aura] ?? "#5fd6ff";
+
+  useEffect(() => {
+    normalizedModel.traverse((object) => {
+      if (!(object as Mesh).isMesh) return;
+      const mesh = object as Mesh;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+    });
+  }, [normalizedModel]);
+
+  useFrame(({ clock }, delta) => {
+    const t = clock.elapsedTime;
+    const moving = locomotion === "walk";
+    const sway = moving ? Math.sin(t * 6.8) * 0.42 : Math.sin(t * 1.6) * 0.07;
+
+    if (wrapperRef.current) {
+      wrapperRef.current.position.y = MathUtils.damp(
+        wrapperRef.current.position.y,
+        moving ? Math.sin(t * 5.6) * 0.035 : Math.sin(t * 2) * 0.016,
+        8,
+        delta
+      );
+    }
+
+    if (leftArm) {
+      leftArm.bone.rotation.x = MathUtils.damp(
+        leftArm.bone.rotation.x,
+        leftArm.restX + sway,
+        10,
+        delta
+      );
+    }
+
+    if (rightArm) {
+      rightArm.bone.rotation.x = MathUtils.damp(
+        rightArm.bone.rotation.x,
+        rightArm.restX - sway,
+        10,
+        delta
+      );
+    }
+
+    if (leftForeArm) {
+      leftForeArm.bone.rotation.z = MathUtils.damp(
+        leftForeArm.bone.rotation.z,
+        leftForeArm.restZ - 0.06,
+        10,
+        delta
+      );
+    }
+
+    if (rightForeArm) {
+      rightForeArm.bone.rotation.z = MathUtils.damp(
+        rightForeArm.bone.rotation.z,
+        rightForeArm.restZ + 0.06,
+        10,
+        delta
+      );
+    }
+
+    if (leftUpLeg) {
+      leftUpLeg.bone.rotation.x = MathUtils.damp(
+        leftUpLeg.bone.rotation.x,
+        leftUpLeg.restX - sway * 0.9,
+        10,
+        delta
+      );
+    }
+
+    if (rightUpLeg) {
+      rightUpLeg.bone.rotation.x = MathUtils.damp(
+        rightUpLeg.bone.rotation.x,
+        rightUpLeg.restX + sway * 0.9,
+        10,
+        delta
+      );
+    }
+
+    if (spine) {
+      spine.bone.rotation.y = MathUtils.damp(
+        spine.bone.rotation.y,
+        spine.restY + Math.sin(t * 0.7) * 0.07,
+        8,
+        delta
+      );
+    }
+
+    if (head) {
+      head.bone.rotation.y = MathUtils.damp(
+        head.bone.rotation.y,
+        head.restY + Math.sin(t * 0.6 + draft.behavior.expression_profile) * 0.1,
+        8,
+        delta
+      );
+    }
+
+    if (auraRef.current) {
+      auraRef.current.rotation.y += delta * 0.8;
+    }
+  });
+
+  return (
+    <group ref={wrapperRef}>
+      <primitive object={normalizedModel} />
+      <group ref={auraRef} position={[0, 0.02, 0]}>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.03, 0]}>
+          <ringGeometry args={[1.05, 1.42, 64]} />
+          <meshBasicMaterial color={auraColor} transparent opacity={0.18} />
+        </mesh>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
+          <ringGeometry args={[1.72, 1.94, 64]} />
+          <meshBasicMaterial color={auraColor} transparent opacity={0.08} />
+        </mesh>
+      </group>
+      <AssetBackpack accessory={draft.starter_style.accessory} color={accessoryColor} />
+    </group>
+  );
+}
+
 export function AvatarFigure({ draft, locomotion = "idle" }: AvatarFigureProps) {
   return (
     <Suspense fallback={<ProceduralAvatarFigure draft={draft} locomotion={locomotion} />}>
-      <TexturedAvatarFigure draft={draft} locomotion={locomotion} />
+      {draft.behavior.style_type === 4 ? (
+        <Wolf3DAvatarFigure draft={draft} locomotion={locomotion} />
+      ) : (
+        <TexturedAvatarFigure draft={draft} locomotion={locomotion} />
+      )}
     </Suspense>
   );
 }

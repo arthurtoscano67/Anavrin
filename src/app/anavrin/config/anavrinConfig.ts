@@ -22,6 +22,9 @@ export const ANAVRIN_CONFIG = {
         model: "/anavrin/characters/female/SM_FantasyFemale.fbx",
         root: "/anavrin/characters/female",
       },
+      premium: {
+        model: "/anavrin/characters/premium/wolf3d-avatar.gltf",
+      },
     },
   },
   zkLogin: {
